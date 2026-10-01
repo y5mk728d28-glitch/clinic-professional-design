@@ -119,6 +119,7 @@ const dict = {
     'agenda.empty': 'No tienes citas asignadas todavía.',
     'agenda.btn_request_change': 'Solicitar cambio / cancelación',
     'agenda.request_sent': 'Solicitud enviada al administrador.',
+    'agenda.permission_required': 'Tu administrador debe habilitar esta opción.',
 
     'patients.title': 'Pacientes atendidos',
     'patients.empty': 'Aún no has atendido pacientes.',
@@ -141,6 +142,7 @@ const dict = {
     'doctors.title': 'Doctores registrados',
     'doctors.list_empty': 'Aún no hay doctores registrados.',
     'doctors.view_agenda': 'Ver agenda',
+    'doctors.allow_changes': 'Permite cancelar/reprogramar',
 
     'requests.title': 'Solicitudes de citas',
     'requests.empty': 'No hay solicitudes pendientes.',
@@ -148,10 +150,12 @@ const dict = {
     'requests.btn_deny': 'Denegar',
     'requests.btn_reassign': 'Reasignar doctor',
     'requests.btn_reschedule': 'Reprogramar',
+    'requests.btn_cancel': 'Cancelar cita',
     'requests.change_requests_title': 'Cambios solicitados por doctores',
 
     'adminpatients.title': 'Pacientes registrados',
     'adminpatients.empty': 'Aún no hay pacientes registrados.',
+    'adminpatients.btn_edit': 'Editar',
 
     'common.back': 'Volver',
     'common.close': 'Cerrar',
@@ -273,6 +277,7 @@ const dict = {
     'agenda.empty': "You don't have any appointments assigned yet.",
     'agenda.btn_request_change': 'Request change / cancellation',
     'agenda.request_sent': 'Request sent to the admin.',
+    'agenda.permission_required': 'Your admin must enable this option.',
 
     'patients.title': 'Patients treated',
     'patients.empty': "You haven't treated any patients yet.",
@@ -295,6 +300,7 @@ const dict = {
     'doctors.title': 'Registered doctors',
     'doctors.list_empty': 'No doctors registered yet.',
     'doctors.view_agenda': 'View schedule',
+    'doctors.allow_changes': 'Allow cancel/reschedule',
 
     'requests.title': 'Appointment requests',
     'requests.empty': 'No pending requests.',
@@ -302,10 +308,12 @@ const dict = {
     'requests.btn_deny': 'Deny',
     'requests.btn_reassign': 'Reassign doctor',
     'requests.btn_reschedule': 'Reschedule',
+    'requests.btn_cancel': 'Cancel appointment',
     'requests.change_requests_title': 'Changes requested by doctors',
 
     'adminpatients.title': 'Registered patients',
     'adminpatients.empty': 'No patients registered yet.',
+    'adminpatients.btn_edit': 'Edit',
 
     'common.back': 'Back',
     'common.close': 'Close',
@@ -427,6 +435,7 @@ const dict = {
     'agenda.empty': 'Ihnen sind noch keine Termine zugewiesen.',
     'agenda.btn_request_change': 'Änderung / Stornierung beantragen',
     'agenda.request_sent': 'Anfrage an den Admin gesendet.',
+    'agenda.permission_required': 'Ihr Admin muss diese Option aktivieren.',
 
     'patients.title': 'Behandelte Patienten',
     'patients.empty': 'Sie haben noch keine Patienten behandelt.',
@@ -449,6 +458,7 @@ const dict = {
     'doctors.title': 'Registrierte Ärzte',
     'doctors.list_empty': 'Noch keine Ärzte registriert.',
     'doctors.view_agenda': 'Terminplan ansehen',
+    'doctors.allow_changes': 'Stornieren/Verschieben erlauben',
 
     'requests.title': 'Terminanfragen',
     'requests.empty': 'Keine offenen Anfragen.',
@@ -456,10 +466,12 @@ const dict = {
     'requests.btn_deny': 'Ablehnen',
     'requests.btn_reassign': 'Arzt neu zuweisen',
     'requests.btn_reschedule': 'Neu planen',
+    'requests.btn_cancel': 'Termin stornieren',
     'requests.change_requests_title': 'Von Ärzten angefragte Änderungen',
 
     'adminpatients.title': 'Registrierte Patienten',
     'adminpatients.empty': 'Noch keine Patienten registriert.',
+    'adminpatients.btn_edit': 'Bearbeiten',
 
     'common.back': 'Zurück',
     'common.close': 'Schließen',

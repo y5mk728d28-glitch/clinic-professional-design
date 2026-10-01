@@ -11,7 +11,7 @@ const S = {
   activeTab: {},
   notice: null,
   booking: { filterDoctorId: '', selectedDate: null, selectedSlot: null, treatmentId: '' },
-  adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null },
+  adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null, editingPatientId: null },
   ratingOpenFor: null,
   changeRequestedIds: new Set(),
   install: { os: 'android', step: 0 },
@@ -42,7 +42,19 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('hashchange', render);
   if (!location.hash) location.hash = '#/welcome';
   render();
+  startInstallAutoplay();
 });
+
+// Reproduce la guía de instalación sola, como un video en loop,
+// mientras el usuario esté en la pantalla de bienvenida.
+function startInstallAutoplay() {
+  setInterval(() => {
+    if (currentRoute() !== '/welcome') return;
+    const total = getInstallSteps(S.install.os).length;
+    S.install.step = (S.install.step + 1) % total;
+    render();
+  }, 2800);
+}
 
 // ---------------------------------------------------------------
 // Render principal
@@ -110,6 +122,8 @@ function installGuide() {
   const steps = getInstallSteps(os);
   const step = Math.min(S.install.step, steps.length - 1);
   const icon = INSTALL_ICONS[os][step];
+  // Pasos con el dedo tocando (interacción); en los demás el dedo no aparece.
+  const showFinger = [1, 2, 3, 4].includes(step);
 
   return `
     <div class="install-guide">
@@ -117,9 +131,15 @@ function installGuide() {
         <button class="btn btn-sm ${os === 'android' ? 'btn-brand' : ''}" data-action="set-install-os" data-os="android">${t('install.os_android')}</button>
         <button class="btn btn-sm ${os === 'ios' ? 'btn-brand' : ''}" data-action="set-install-os" data-os="ios">${t('install.os_ios')}</button>
       </div>
-      <div class="install-step-card">
-        <div class="install-step-icon">${icon}</div>
-        <p class="install-step-text">${steps[step]}</p>
+      <div class="install-phone">
+        <div class="install-phone-screen">
+          <div class="install-phone-icon">${icon}</div>
+        </div>
+        ${showFinger ? '<div class="install-finger">👆</div>' : ''}
+      </div>
+      <p class="install-step-text install-step-text--dark">${steps[step]}</p>
+      <div class="install-dots">
+        ${steps.map((_, i) => `<span class="install-dot ${i === step ? 'active' : ''}"></span>`).join('')}
       </div>
       <div class="btn-row" style="justify-content:space-between; align-items:center;">
         <button class="btn btn-sm" data-action="install-prev" ${step === 0 ? 'disabled' : ''}>${t('install.btn_prev')}</button>
@@ -512,9 +532,13 @@ function doctorAgendaTab(user) {
               actions += `<button class="btn btn-accept btn-sm" data-action="mark-attended" data-booking="${b.id}">✓</button> `;
             }
             if (['pendiente', 'aprobada'].includes(b.status)) {
-              actions += hasOpenRequest
-                ? `<span class="muted">${t('agenda.request_sent')}</span>`
-                : `<button class="btn btn-deny btn-sm" data-action="request-change" data-booking="${b.id}">${t('agenda.btn_request_change')}</button>`;
+              if (hasOpenRequest) {
+                actions += `<span class="muted">${t('agenda.request_sent')}</span>`;
+              } else if (user.canRequestChanges) {
+                actions += `<button class="btn btn-deny btn-sm" data-action="request-change" data-booking="${b.id}">${t('agenda.btn_request_change')}</button>`;
+              } else {
+                actions += `<span class="muted">${t('agenda.permission_required')}</span>`;
+              }
             }
             return `<tr>
               <td>${b.date} ${b.startTime}–${b.endTime}<br/><span class="muted">${patient ? patient.nombre + ' ' + patient.apellidos : ''}</span></td>
@@ -625,33 +649,38 @@ function adminTreatmentsTab() {
 function adminDoctorsTab() {
   const doctors = db.getUsersByRole('doctor');
   if (doctors.length === 0) return `<p class="muted">${t('doctors.list_empty')}</p>`;
+  const treatments = db.getTreatments();
+  const slots = cal.generateSlotStarts();
+  const ctx = { doctors, treatments, slots };
 
   return `
     <h2>${t('doctors.title')}</h2>
     <table>
-      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th></th></tr></thead>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('doctors.allow_changes')}</th><th></th></tr></thead>
       <tbody>
         ${doctors
           .map((d) => {
             const expanded = S.adminUI.expandedDoctorId === d.id;
-            let agendaRows = '';
+            let agendaBlock = '';
             if (expanded) {
-              const bookings = db.getBookingsForDoctor(d.id);
-              agendaRows = bookings.length
-                ? bookings
-                    .map((b) => {
-                      const patient = db.getUserById(b.patientId);
-                      return `<tr><td>${b.date} ${b.startTime}–${b.endTime}</td><td>${patient ? patient.nombre + ' ' + patient.apellidos : ''}</td><td>${t('appointments.status_' + b.status)}</td></tr>`;
-                    })
-                    .join('')
-                : `<tr><td colspan="3" class="muted">${t('agenda.empty')}</td></tr>`;
+              const bookings = db
+                .getBookingsForDoctor(d.id)
+                .filter((b) => ['pendiente', 'reasignada', 'aprobada'].includes(b.status))
+                .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+              agendaBlock = bookings.length
+                ? `<table>
+                    <thead><tr><th>Paciente</th><th>Doctor</th><th>${t('treatments.name')}</th><th>${t('booking.title')}</th><th>Status</th><th></th></tr></thead>
+                    <tbody>${bookings.map((b) => renderBookingRow(b, ctx)).join('')}</tbody>
+                  </table>`
+                : `<p class="muted">${t('agenda.empty')}</p>`;
             }
             return `
               <tr>
                 <td>${d.nombre} ${d.apellidos}</td><td>${d.especialidad || ''}</td><td>${d.telefono}</td><td>${d.email}</td>
+                <td><input type="checkbox" data-onchange="toggle-doctor-permission" data-doctor="${d.id}" style="width:auto;" ${d.canRequestChanges ? 'checked' : ''} /></td>
                 <td><button class="btn btn-sm" data-action="toggle-doctor-agenda" data-doctor="${d.id}">${t('doctors.view_agenda')}</button></td>
               </tr>
-              ${expanded ? `<tr><td colspan="5"><table>${agendaRows}</table></td></tr>` : ''}
+              ${expanded ? `<tr><td colspan="6">${agendaBlock}</td></tr>` : ''}
             `;
           })
           .join('')}
@@ -660,62 +689,75 @@ function adminDoctorsTab() {
   `;
 }
 
+// Fila reutilizable de una cita, con sus acciones según el estado —
+// usada tanto en la cola de solicitudes como en la agenda expandida de un doctor.
+function renderBookingRow(b, { doctors, treatments, slots }) {
+  const patient = db.getUserById(b.patientId);
+  const doctor = db.getUserById(b.doctorId);
+  const tx = treatments.find((x) => x.id === b.treatmentId);
+  const badgeClass = { pendiente: 'badge-pending', reasignada: 'badge-pending', aprobada: 'badge-approved', rechazada: 'badge-denied', cancelada: 'badge-denied', completada: 'badge-done' }[b.status];
+  const reassignOpen = S.adminUI.reassignOpenFor === b.id;
+  const rescheduleOpen = S.adminUI.rescheduleOpenFor === b.id;
+
+  let actions = '';
+  if (['pendiente', 'reasignada'].includes(b.status)) {
+    actions += `<button class="btn btn-accept btn-sm" data-action="approve-booking" data-booking="${b.id}">${t('requests.btn_approve')}</button>`;
+    actions += `<button class="btn btn-deny btn-sm" data-action="deny-booking" data-booking="${b.id}">${t('requests.btn_deny')}</button>`;
+  }
+  if (b.status === 'aprobada') {
+    actions += `<button class="btn btn-deny btn-sm" data-action="cancel-booking" data-booking="${b.id}">${t('requests.btn_cancel')}</button>`;
+  }
+  if (['pendiente', 'reasignada', 'aprobada'].includes(b.status)) {
+    actions += `<button class="btn btn-sm" data-action="toggle-reassign" data-booking="${b.id}">${t('requests.btn_reassign')}</button>`;
+    actions += `<button class="btn btn-sm" data-action="toggle-reschedule" data-booking="${b.id}">${t('requests.btn_reschedule')}</button>`;
+  }
+
+  const mainRow = `
+    <tr>
+      <td>${patient ? patient.nombre + ' ' + patient.apellidos : ''}</td>
+      <td>${doctor ? doctor.nombre + ' ' + doctor.apellidos : '—'}</td>
+      <td>${tx ? tx.nombre : ''}</td>
+      <td>${b.date} ${b.startTime}–${b.endTime}</td>
+      <td><span class="badge ${badgeClass}">${t('appointments.status_' + b.status)}</span></td>
+      <td class="btn-row">${actions}</td>
+    </tr>`;
+
+  const reassignRow = reassignOpen
+    ? `<tr><td colspan="6">
+        <div class="btn-row" style="align-items:center;">
+          <select data-select="reassign-doctor" data-booking="${b.id}">
+            ${doctors.map((d) => `<option value="${d.id}" ${d.id === b.doctorId ? 'selected' : ''}>${d.nombre} ${d.apellidos}</option>`).join('')}
+          </select>
+          <button class="btn btn-accept btn-sm" data-action="confirm-reassign" data-booking="${b.id}">${t('common.save')}</button>
+        </div>
+      </td></tr>`
+    : '';
+
+  const rescheduleRow = rescheduleOpen
+    ? `<tr><td colspan="6">
+        <div class="btn-row" style="align-items:center;">
+          <input type="date" data-select="reschedule-date" data-booking="${b.id}" value="${b.date}" />
+          <select data-select="reschedule-time" data-booking="${b.id}">
+            ${slots.map((s) => `<option value="${s}" ${cal.minutesToTime(s) === b.startTime ? 'selected' : ''}>${cal.minutesToTime(s)}</option>`).join('')}
+          </select>
+          <button class="btn btn-accept btn-sm" data-action="confirm-reschedule" data-booking="${b.id}">${t('common.save')}</button>
+        </div>
+      </td></tr>`
+    : '';
+
+  return mainRow + reassignRow + rescheduleRow;
+}
+
 function adminRequestsTab() {
-  const bookings = db.getBookings().filter((b) => ['pendiente', 'reasignada'].includes(b.status));
+  const bookings = db.getBookings().filter((b) => ['pendiente', 'reasignada', 'aprobada'].includes(b.status));
   const doctors = db.getUsersByRole('doctor');
   const treatments = db.getTreatments();
   const slots = cal.generateSlotStarts();
+  const ctx = { doctors, treatments, slots };
 
   const pendingRows = bookings.length
-    ? bookings
-        .map((b) => {
-          const patient = db.getUserById(b.patientId);
-          const doctor = db.getUserById(b.doctorId);
-          const tx = treatments.find((x) => x.id === b.treatmentId);
-          const reassignOpen = S.adminUI.reassignOpenFor === b.id;
-          const rescheduleOpen = S.adminUI.rescheduleOpenFor === b.id;
-          return `
-            <tr>
-              <td>${patient ? patient.nombre + ' ' + patient.apellidos : ''}</td>
-              <td>${doctor ? doctor.nombre + ' ' + doctor.apellidos : '—'}</td>
-              <td>${tx ? tx.nombre : ''}</td>
-              <td>${b.date} ${b.startTime}–${b.endTime}</td>
-              <td class="btn-row">
-                <button class="btn btn-accept btn-sm" data-action="approve-booking" data-booking="${b.id}">${t('requests.btn_approve')}</button>
-                <button class="btn btn-deny btn-sm" data-action="deny-booking" data-booking="${b.id}">${t('requests.btn_deny')}</button>
-                <button class="btn btn-sm" data-action="toggle-reassign" data-booking="${b.id}">${t('requests.btn_reassign')}</button>
-                <button class="btn btn-sm" data-action="toggle-reschedule" data-booking="${b.id}">${t('requests.btn_reschedule')}</button>
-              </td>
-            </tr>
-            ${
-              reassignOpen
-                ? `<tr><td colspan="5">
-                    <div class="btn-row" style="align-items:center;">
-                      <select data-select="reassign-doctor" data-booking="${b.id}">
-                        ${doctors.map((d) => `<option value="${d.id}">${d.nombre} ${d.apellidos}</option>`).join('')}
-                      </select>
-                      <button class="btn btn-accept btn-sm" data-action="confirm-reassign" data-booking="${b.id}">${t('common.save')}</button>
-                    </div>
-                  </td></tr>`
-                : ''
-            }
-            ${
-              rescheduleOpen
-                ? `<tr><td colspan="5">
-                    <div class="btn-row" style="align-items:center;">
-                      <input type="date" data-select="reschedule-date" data-booking="${b.id}" value="${b.date}" />
-                      <select data-select="reschedule-time" data-booking="${b.id}">
-                        ${slots.map((s) => `<option value="${s}" ${cal.minutesToTime(s) === b.startTime ? 'selected' : ''}>${cal.minutesToTime(s)}</option>`).join('')}
-                      </select>
-                      <button class="btn btn-accept btn-sm" data-action="confirm-reschedule" data-booking="${b.id}">${t('common.save')}</button>
-                    </div>
-                  </td></tr>`
-                : ''
-            }
-          `;
-        })
-        .join('')
-    : `<tr><td colspan="5" class="muted">${t('requests.empty')}</td></tr>`;
+    ? bookings.map((b) => renderBookingRow(b, ctx)).join('')
+    : `<tr><td colspan="6" class="muted">${t('requests.empty')}</td></tr>`;
 
   const changeRequests = db.getChangeRequests().filter((r) => r.status === 'pendiente');
   const changeRows = changeRequests.length
@@ -738,7 +780,7 @@ function adminRequestsTab() {
   return `
     <h2>${t('requests.title')}</h2>
     <table>
-      <thead><tr><th>Paciente</th><th>Doctor</th><th>${t('treatments.name')}</th><th>${t('booking.title')}</th><th></th></tr></thead>
+      <thead><tr><th>Paciente</th><th>Doctor</th><th>${t('treatments.name')}</th><th>${t('booking.title')}</th><th>Status</th><th></th></tr></thead>
       <tbody>${pendingRows}</tbody>
     </table>
     <h2 style="margin-top:20px;">${t('requests.change_requests_title')}</h2>
@@ -755,16 +797,32 @@ function adminPatientsTab() {
   return `
     <h2>${t('adminpatients.title')}</h2>
     <table>
-      <thead><tr><th>${t('settings.name')}</th><th>${t('settings.age')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('intake.smoker')}</th><th>${t('intake.conditions')}</th></tr></thead>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('settings.age')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('intake.smoker')}</th><th>${t('intake.conditions')}</th><th></th></tr></thead>
       <tbody>
         ${patients
           .map((p) => {
             const intake = db.getIntake(p.id);
-            return `<tr>
+            const editing = S.adminUI.editingPatientId === p.id;
+            const row = `<tr>
               <td>${p.nombre} ${p.apellidos}</td><td>${p.edad ?? '—'}</td><td>${p.telefono}</td><td>${p.email}</td>
               <td>${intake ? (intake.fuma === 'si' ? t('intake.smoker_yes') : t('intake.smoker_no')) : '—'}</td>
               <td>${intake?.condiciones || '—'}</td>
+              <td><button class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('adminpatients.btn_edit')}</button></td>
             </tr>`;
+            const editRow = editing
+              ? `<tr><td colspan="7">
+                  <form data-form="edit-patient" data-patient="${p.id}" class="field-row" style="align-items:flex-end;">
+                    <label>${t('register.firstname')}<input type="text" name="nombre" value="${p.nombre}" required /></label>
+                    <label>${t('register.lastname')}<input type="text" name="apellidos" value="${p.apellidos}" required /></label>
+                    <label>${t('settings.age')}<input type="number" name="edad" value="${p.edad ?? ''}" /></label>
+                    <label>${t('settings.phone')}<input type="tel" name="telefono" value="${p.telefono}" required /></label>
+                    <label>${t('settings.email')}<input type="email" name="email" value="${p.email}" required /></label>
+                    <button type="submit" class="btn btn-accept btn-sm">${t('common.save')}</button>
+                    <button type="button" class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('common.cancel')}</button>
+                  </form>
+                </td></tr>`
+              : '';
+            return row + editRow;
           })
           .join('')}
       </tbody>
@@ -890,6 +948,8 @@ function onClick(e) {
 
   if (action === 'request-change') {
     const session = db.getSession();
+    const doctor = db.getUserById(session.userId);
+    if (!doctor?.canRequestChanges) return render();
     db.addChangeRequest({ bookingId: el.dataset.booking, doctorId: session.userId });
     S.notice = t('agenda.request_sent');
     return render();
@@ -907,6 +967,16 @@ function onClick(e) {
 
   if (action === 'deny-booking') {
     db.updateBooking(el.dataset.booking, { status: 'rechazada' });
+    return render();
+  }
+
+  if (action === 'cancel-booking') {
+    db.updateBooking(el.dataset.booking, { status: 'cancelada' });
+    return render();
+  }
+
+  if (action === 'toggle-edit-patient') {
+    S.adminUI.editingPatientId = S.adminUI.editingPatientId === el.dataset.patient ? null : el.dataset.patient;
     return render();
   }
 
@@ -984,6 +1054,11 @@ function onChange(e) {
     db.setCurrency(el.value);
     return render();
   }
+
+  if (action === 'toggle-doctor-permission') {
+    db.updateUser(el.dataset.doctor, { canRequestChanges: el.checked });
+    return render();
+  }
 }
 
 function handleConfirmBooking() {
@@ -1054,6 +1129,19 @@ function onSubmit(e) {
 
   if (type === 'add-treatment') {
     db.addTreatment(data);
+    return render();
+  }
+
+  if (type === 'edit-patient') {
+    db.updateUser(form.dataset.patient, {
+      nombre: data.nombre,
+      apellidos: data.apellidos,
+      edad: data.edad,
+      telefono: data.telefono,
+      email: data.email,
+    });
+    S.adminUI.editingPatientId = null;
+    S.notice = t('settings.saved_msg');
     return render();
   }
 

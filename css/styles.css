@@ -375,25 +375,61 @@ th { color: var(--gray-700); font-size: 0.78rem; text-transform: uppercase; lett
   width: 100%;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
 }
 
-.install-step-card {
-  background: var(--brand-gradient);
-  color: var(--white);
-  border-radius: var(--radius-md);
-  padding: 28px 16px;
-  min-height: 130px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  text-align: center;
+.install-phone {
+  width: 148px;
+  height: 256px;
+  border: 4px solid var(--gray-900);
+  border-radius: 26px;
+  background: var(--white);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-pop);
 }
 
-.install-step-icon { font-size: 2.2rem; line-height: 1; }
-.install-step-text { color: var(--white); font-weight: 600; margin: 0; }
+.install-phone-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-gradient-soft);
+}
+
+.install-phone-icon {
+  font-size: 2.6rem;
+  animation: install-icon-pop 0.35s ease;
+}
+
+.install-finger {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  font-size: 1.7rem;
+  transform-origin: bottom right;
+  animation: install-tap 1.1s ease-in-out infinite;
+}
+
+@keyframes install-icon-pop {
+  from { transform: scale(0.7); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes install-tap {
+  0%   { transform: scale(0.85) translate(10px, 10px); opacity: 0; }
+  35%  { transform: scale(1.1) translate(0, 0); opacity: 1; }
+  55%  { transform: scale(0.92) translate(0, 0); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+
+.install-dots { display: flex; gap: 6px; }
+.install-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-200); }
+.install-dot.active { background: var(--emerald-600); }
+
+.install-step-text--dark { color: var(--gray-900); font-weight: 600; text-align: center; margin: 0; min-height: 44px; }
 
 @media (max-width: 480px) {
   .card { padding: 20px 16px; }
