@@ -10,7 +10,14 @@ import * as cal from './calendar.js';
 const S = {
   activeTab: {},
   notice: null,
-  booking: { filterDoctorId: '', selectedDate: null, selectedSlot: null, treatmentId: '' },
+  booking: {
+    filterDoctorId: '',
+    selectedDate: null,
+    selectedSlot: null,
+    treatmentId: '',
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  },
   adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null, editingPatientId: null },
   ratingOpenFor: null,
   changeRequestedIds: new Set(),
@@ -21,6 +28,14 @@ function formatMoney(amount) {
   const code = db.getCurrency();
   const symbol = (CURRENCIES[code] && CURRENCIES[code].symbol) || '$';
   return `${symbol}${amount}`;
+}
+
+// Fechas en formato largo ("10 de octubre de 2026") para evitar la ambigüedad
+// del formato numérico (MM/DD vs DD/MM) entre países.
+function formatDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(LOCALE_MAP[getLang()], { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function goto(route) {
@@ -169,6 +184,33 @@ function viewLogin() {
         </div>
       </form>
       <button class="link-btn" data-action="goto" data-route="#/role-select">${t('login.no_account')}</button>
+    </div>
+    ${accountsQuickPick()}
+  `;
+}
+
+// Lista de cuentas ya creadas, para entrar directo a cualquiera durante las
+// pruebas sin tener que recordar el correo de cada una.
+function accountsQuickPick() {
+  const users = db.getUsers();
+  if (users.length === 0) return '';
+  const roleLabel = { patient: t('role.patient'), doctor: t('role.doctor'), admin: t('role.admin') };
+
+  return `
+    <div class="card">
+      <h3>${t('login.quickpick_title')}</h3>
+      <p class="muted">${t('login.quickpick_subtitle')}</p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${users
+          .map(
+            (u) => `
+          <div class="btn-row" style="justify-content:space-between; align-items:center;">
+            <span>${u.nombre} ${u.apellidos} <span class="muted">· ${roleLabel[u.role]} · ${u.email}</span></span>
+            <button class="btn btn-sm" data-action="login-as" data-user="${u.id}">${t('login.btn_use_account')}</button>
+          </div>`
+          )
+          .join('')}
+      </div>
     </div>
   `;
 }
@@ -349,9 +391,10 @@ function patientBookingTab(user) {
   const doctors = db.getUsersByRole('doctor');
   const bookings = db.getBookings();
   const filterId = S.booking.filterDoctorId;
-  const now = new Date();
-  const weeks = cal.getMonthMatrix(now.getFullYear(), now.getMonth());
-  const monthLabel = now.toLocaleDateString(LOCALE_MAP[getLang()], { month: 'long', year: 'numeric' });
+  const viewYear = S.booking.viewYear;
+  const viewMonth = S.booking.viewMonth;
+  const weeks = cal.getMonthMatrix(viewYear, viewMonth);
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString(LOCALE_MAP[getLang()], { month: 'long', year: 'numeric' });
   const weekdayLabels = weeks[1].map((d) => d.toLocaleDateString(LOCALE_MAP[getLang()], { weekday: 'short' }));
 
   const doctorIds = doctors.map((d) => d.id);
@@ -359,8 +402,8 @@ function patientBookingTab(user) {
   const dayCells = weeks
     .flat()
     .map((date) => {
-      const inMonth = date.getMonth() === now.getMonth();
-      const status = cal.getDayStatus({ date, doctorIds, bookings, filterDoctorId: filterId || null });
+      const inMonth = date.getMonth() === viewMonth;
+      const status = cal.getDayStatus({ date, doctorIds, bookings, filterDoctorId: filterId || null, patientId: user.id });
       const dateKey = cal.dateToKey(date);
       const selected = S.booking.selectedDate === dateKey ? 'selected' : '';
       const clickable = status === 'available' && inMonth;
@@ -424,7 +467,11 @@ function patientBookingTab(user) {
       </select>
     </label>
 
-    <h2 style="text-transform:capitalize;">${monthLabel}</h2>
+    <div class="btn-row" style="justify-content:space-between; align-items:center; width:100%;">
+      <button class="btn btn-sm" data-action="month-prev">‹</button>
+      <h2 style="text-transform:capitalize;">${monthLabel}</h2>
+      <button class="btn btn-sm" data-action="month-next">›</button>
+    </div>
     <div class="calendar-grid">
       ${weekdayLabels.map((w) => `<div class="muted" style="text-align:center; text-transform:capitalize;">${w}</div>`).join('')}
       ${dayCells}
@@ -433,6 +480,7 @@ function patientBookingTab(user) {
       <span><span class="legend-swatch" style="background:var(--sapphire-500)"></span>${t('booking.legend_available')}</span>
       <span><span class="legend-swatch" style="background:var(--red-500)"></span>${t('booking.legend_full')}</span>
       <span><span class="legend-swatch" style="background:var(--white); border:1px solid var(--gray-400);"></span>${t('booking.legend_unavailable')}</span>
+      <span><span class="legend-swatch" style="background:var(--emerald-600)"></span>${t('booking.legend_attended')}</span>
     </div>
 
     ${slotsBlock}
@@ -476,7 +524,7 @@ function patientAppointmentsTab(user) {
       return `
         <div class="card" style="max-width:none;">
           <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-            <strong>${b.date} · ${b.startTime}–${b.endTime}</strong>
+            <strong>${formatDate(b.date)} · ${b.startTime}–${b.endTime}</strong>
             <span class="badge ${badgeClass}">${t('appointments.status_' + b.status)}</span>
           </div>
           <p>${tx ? tx.nombre : ''} — Dr(a). ${doctor ? doctor.nombre + ' ' + doctor.apellidos : '—'}</p>
@@ -541,7 +589,7 @@ function doctorAgendaTab(user) {
               }
             }
             return `<tr>
-              <td>${b.date} ${b.startTime}–${b.endTime}<br/><span class="muted">${patient ? patient.nombre + ' ' + patient.apellidos : ''}</span></td>
+              <td>${formatDate(b.date)} ${b.startTime}–${b.endTime}<br/><span class="muted">${patient ? patient.nombre + ' ' + patient.apellidos : ''}</span></td>
               <td>${tx ? tx.nombre : ''}</td>
               <td><span class="badge ${badgeClass}">${t('appointments.status_' + b.status)}</span></td>
               <td>${actions}</td>
@@ -717,7 +765,7 @@ function renderBookingRow(b, { doctors, treatments, slots }) {
       <td>${patient ? patient.nombre + ' ' + patient.apellidos : ''}</td>
       <td>${doctor ? doctor.nombre + ' ' + doctor.apellidos : '—'}</td>
       <td>${tx ? tx.nombre : ''}</td>
-      <td>${b.date} ${b.startTime}–${b.endTime}</td>
+      <td>${formatDate(b.date)} ${b.startTime}–${b.endTime}</td>
       <td><span class="badge ${badgeClass}">${t('appointments.status_' + b.status)}</span></td>
       <td class="btn-row">${actions}</td>
     </tr>`;
@@ -767,7 +815,7 @@ function adminRequestsTab() {
           const doctor = db.getUserById(r.doctorId);
           return `<tr>
             <td>${doctor ? doctor.nombre + ' ' + doctor.apellidos : ''}</td>
-            <td>${booking ? booking.date + ' ' + booking.startTime : '—'}</td>
+            <td>${booking ? formatDate(booking.date) + ' ' + booking.startTime : '—'}</td>
             <td class="btn-row">
               <button class="btn btn-accept btn-sm" data-action="approve-change" data-request="${r.id}">${t('requests.btn_approve')}</button>
               <button class="btn btn-deny btn-sm" data-action="deny-change" data-request="${r.id}">${t('requests.btn_deny')}</button>
@@ -901,6 +949,13 @@ function onClick(e) {
     return goto('#/welcome');
   }
 
+  if (action === 'login-as') {
+    const user = db.getUserById(el.dataset.user);
+    if (!user) return;
+    db.setSession({ userId: user.id, role: user.role });
+    return goto(user.role === 'patient' && !db.getIntake(user.id) ? '#/intake' : '#/dashboard');
+  }
+
   if (action === 'set-tab') {
     S.activeTab[el.dataset.role] = el.dataset.tab;
     return render();
@@ -910,6 +965,17 @@ function onClick(e) {
     S.booking.selectedDate = el.dataset.date;
     S.booking.selectedSlot = null;
     S.booking.treatmentId = '';
+    return render();
+  }
+
+  if (action === 'month-prev' || action === 'month-next') {
+    const delta = action === 'month-prev' ? -1 : 1;
+    let { viewYear, viewMonth } = S.booking;
+    viewMonth += delta;
+    if (viewMonth < 0) { viewMonth = 11; viewYear -= 1; }
+    if (viewMonth > 11) { viewMonth = 0; viewYear += 1; }
+    S.booking.viewYear = viewYear;
+    S.booking.viewMonth = viewMonth;
     return render();
   }
 
@@ -1102,15 +1168,24 @@ function onSubmit(e) {
   const data = Object.fromEntries(new FormData(form).entries());
 
   if (type === 'login') {
+    const input = data.username.trim();
     const map = { '1': 'patient', '2': 'doctor', '3': 'admin' };
-    const role = map[data.username.trim()];
-    if (!role) {
-      S.notice = t('login.username_hint');
-      return render();
+
+    if (map[input]) {
+      const role = map[input];
+      const user = getOrCreateDemoUser(role);
+      db.setSession({ userId: user.id, role });
+      return goto(role === 'patient' && !db.getIntake(user.id) ? '#/intake' : '#/dashboard');
     }
-    const user = getOrCreateDemoUser(role);
-    db.setSession({ userId: user.id, role });
-    return goto(role === 'patient' && !db.getIntake(user.id) ? '#/intake' : '#/dashboard');
+
+    const byEmail = db.getUsers().find((u) => u.email.toLowerCase() === input.toLowerCase());
+    if (byEmail) {
+      db.setSession({ userId: byEmail.id, role: byEmail.role });
+      return goto(byEmail.role === 'patient' && !db.getIntake(byEmail.id) ? '#/intake' : '#/dashboard');
+    }
+
+    S.notice = t('login.not_found');
+    return render();
   }
 
   if (type === 'register') {

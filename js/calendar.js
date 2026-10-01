@@ -54,24 +54,30 @@ export function doctorHasFreeSlotOnDay(bookings, doctorId, dateKey, durationMin 
   return generateSlotStarts().some((start) => isSlotFreeForDoctor(bookings, doctorId, dateKey, start, durationMin));
 }
 
-// status: 'available' | 'full' | 'unavailable'
-export function getDayStatus({ date, doctorIds, bookings, filterDoctorId }) {
+// status: 'available' | 'full' | 'unavailable' | 'attended'
+export function getDayStatus({ date, doctorIds, bookings, filterDoctorId, patientId }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dayCopy = new Date(date);
   dayCopy.setHours(0, 0, 0, 0);
+  const dateKey = dateToKey(dayCopy);
 
   const isPast = dayCopy < today;
+  if (isPast) {
+    const wasAttended =
+      patientId && bookings.some((b) => b.patientId === patientId && b.date === dateKey && b.status === 'completada');
+    return wasAttended ? 'attended' : 'unavailable';
+  }
+
   const dow = dayCopy.getDay(); // 0 = domingo
   const isSunday = dow === 0;
   const diffDays = Math.round((dayCopy - today) / 86400000);
   const tooFar = diffDays > BOOKABLE_DAYS_AHEAD;
 
-  if (isPast || isSunday || tooFar || doctorIds.length === 0) {
+  if (isSunday || tooFar || doctorIds.length === 0) {
     return 'unavailable';
   }
 
-  const dateKey = dateToKey(dayCopy);
   const targetDoctors = filterDoctorId ? [filterDoctorId] : doctorIds;
   const anyFree = targetDoctors.some((docId) => doctorHasFreeSlotOnDay(bookings, docId, dateKey));
   return anyFree ? 'available' : 'full';

@@ -294,6 +294,7 @@ input:focus, select:focus, textarea:focus {
 .calendar-day.available { background: var(--sapphire-500); color: var(--white); cursor: pointer; border-color: var(--sapphire-700); }
 .calendar-day.full { background: var(--red-500); color: var(--white); border-color: var(--red-600); }
 .calendar-day.unavailable { background: var(--white); color: var(--gray-400); }
+.calendar-day.attended { background: var(--emerald-600); color: var(--white); border-color: var(--emerald-700); }
 .calendar-day.selected { outline: 3px solid var(--emerald-600); }
 
 .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.8rem; color: var(--gray-700); }
