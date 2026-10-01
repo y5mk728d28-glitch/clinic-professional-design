@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cpd-cache-v1';
+const CACHE_NAME = 'cpd-cache-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const CORE_ASSETS = [
   './js/app.js',
   './js/i18n.js',
   './js/db.js',
+  './js/supabaseClient.js',
   './js/calendar.js',
   './js/config.js',
   './manifest.json',

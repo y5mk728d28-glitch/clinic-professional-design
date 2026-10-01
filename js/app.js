@@ -20,15 +20,13 @@ const S = {
   },
   adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null, editingPatientId: null },
   ratingOpenFor: null,
-  changeRequestedIds: new Set(),
   install: { os: 'android', step: 0 },
 };
 
-function formatMoney(amount) {
-  const code = db.getCurrency();
-  const symbol = (CURRENCIES[code] && CURRENCIES[code].symbol) || '$';
-  return `${symbol}${amount}`;
-}
+// Usuario real autenticado (perfil de la tabla `profiles`), mantenido en
+// sincronía por el listener de Supabase Auth. null = no ha iniciado sesión.
+let authUser = null;
+let authReady = false;
 
 // Fechas en formato largo ("10 de octubre de 2026") para evitar la ambigüedad
 // del formato numérico (MM/DD vs DD/MM) entre países.
@@ -56,8 +54,13 @@ document.addEventListener('DOMContentLoaded', () => {
   app.addEventListener('submit', onSubmit);
   window.addEventListener('hashchange', render);
   if (!location.hash) location.hash = '#/welcome';
-  render();
   startInstallAutoplay();
+
+  db.onAuthChange(async (session) => {
+    authUser = session ? await db.getUserById(session.user.id) : null;
+    authReady = true;
+    render();
+  });
 });
 
 // Reproduce la guía de instalación sola, como un video en loop,
@@ -74,11 +77,15 @@ function startInstallAutoplay() {
 // ---------------------------------------------------------------
 // Render principal
 // ---------------------------------------------------------------
-function render() {
+async function render() {
   const app = document.getElementById('app');
-  const session = db.getSession();
-  const route = currentRoute();
 
+  if (!authReady) {
+    app.innerHTML = `<div class="view"><p class="muted">…</p></div>`;
+    return;
+  }
+
+  const route = currentRoute();
   const notice = S.notice;
   S.notice = null;
 
@@ -87,17 +94,20 @@ function render() {
   else if (route === '/login') body = viewLogin();
   else if (route === '/role-select') body = viewRoleSelect();
   else if (route.startsWith('/register/')) body = viewRegister(route.split('/')[2]);
-  else if (route === '/intake') body = session ? viewIntake(session) : viewWelcome();
-  else if (route === '/dashboard') body = session ? viewDashboard(session) : viewWelcome();
+  else if (route === '/intake') body = authUser ? viewIntake() : viewWelcome();
+  else if (route === '/dashboard') body = authUser ? await viewDashboard() : viewWelcome();
   else body = viewWelcome();
 
-  if (!session && route === '/dashboard') goto('#/welcome');
+  if (!authUser && route === '/dashboard') {
+    goto('#/welcome');
+    return;
+  }
 
   app.innerHTML = `
     <div class="topbar">
       <div class="topbar__brand"><span class="dot"></span> ${BUSINESS.name}</div>
       <div style="display:flex; align-items:center; gap:14px;">
-        ${session ? `<button class="btn btn-deny btn-sm" data-action="logout">${t('nav.logout')}</button>` : ''}
+        ${authUser ? `<button class="btn btn-deny btn-sm" data-action="logout">${t('nav.logout')}</button>` : ''}
         <div class="lang-switch">
           ${LANGS.map((l) => `<button data-action="set-lang" data-lang="${l}" class="${l === getLang() ? 'active' : ''}">${l.toUpperCase()}</button>`).join('')}
         </div>
@@ -170,47 +180,19 @@ function viewLogin() {
     <div class="card">
       <h1>${t('login.title')}</h1>
       <form data-form="login">
-        <label>${t('login.username_label')}
-          <input type="text" name="username" required />
+        <label>${t('login.email_label')}
+          <input type="email" name="email" required />
         </label>
-        <p class="muted">${t('login.username_hint')}</p>
         <label>${t('login.password_label')}
           <input type="password" name="password" required />
         </label>
-        <p class="muted">${t('login.password_hint')}</p>
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('login.btn_submit')}</button>
           <button type="button" class="btn btn-block" data-action="goto" data-route="#/welcome">${t('login.btn_back')}</button>
         </div>
       </form>
       <button class="link-btn" data-action="goto" data-route="#/role-select">${t('login.no_account')}</button>
-    </div>
-    ${accountsQuickPick()}
-  `;
-}
-
-// Lista de cuentas ya creadas, para entrar directo a cualquiera durante las
-// pruebas sin tener que recordar el correo de cada una.
-function accountsQuickPick() {
-  const users = db.getUsers();
-  if (users.length === 0) return '';
-  const roleLabel = { patient: t('role.patient'), doctor: t('role.doctor'), admin: t('role.admin') };
-
-  return `
-    <div class="card">
-      <h3>${t('login.quickpick_title')}</h3>
-      <p class="muted">${t('login.quickpick_subtitle')}</p>
-      <div style="display:flex; flex-direction:column; gap:8px;">
-        ${users
-          .map(
-            (u) => `
-          <div class="btn-row" style="justify-content:space-between; align-items:center;">
-            <span>${u.nombre} ${u.apellidos} <span class="muted">· ${roleLabel[u.role]} · ${u.email}</span></span>
-            <button class="btn btn-sm" data-action="login-as" data-user="${u.id}">${t('login.btn_use_account')}</button>
-          </div>`
-          )
-          .join('')}
-      </div>
+      <button class="link-btn" data-action="forgot-password">${t('login.forgot_password')}</button>
     </div>
   `;
 }
@@ -288,7 +270,7 @@ function viewRegister(role) {
         </div>
         ${extraFields}
         <label>${t('register.password')}
-          <input type="password" name="password" required />
+          <input type="password" name="password" required minlength="6" />
         </label>
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('register.btn_submit')}</button>
@@ -300,8 +282,8 @@ function viewRegister(role) {
   `;
 }
 
-function viewIntake(session) {
-  const user = db.getUserById(session.userId);
+function viewIntake() {
+  const user = authUser;
   return `
     <div class="card">
       <h1>${t('intake.title')}</h1>
@@ -334,19 +316,17 @@ function viewIntake(session) {
 // ---------------------------------------------------------------
 // Dashboard router por rol
 // ---------------------------------------------------------------
-function viewDashboard(session) {
-  const user = db.getUserById(session.userId);
-  if (!user) {
-    db.clearSession();
-    goto('#/welcome');
-    return '';
+async function viewDashboard() {
+  const user = authUser;
+  if (user.role === 'patient') {
+    const intake = await db.getIntake(user.id);
+    if (!intake) {
+      goto('#/intake');
+      return '';
+    }
+    return dashboardPatient(user);
   }
-  if (session.role === 'patient' && !db.getIntake(user.id)) {
-    goto('#/intake');
-    return '';
-  }
-  if (session.role === 'patient') return dashboardPatient(user);
-  if (session.role === 'doctor') return dashboardDoctor(user);
+  if (user.role === 'doctor') return dashboardDoctor(user);
   return dashboardAdmin(user);
 }
 
@@ -367,7 +347,7 @@ function tabsBar(role, tabs) {
 // ---------------------------------------------------------------
 // PACIENTE
 // ---------------------------------------------------------------
-function dashboardPatient(user) {
+async function dashboardPatient(user) {
   const tabs = [
     { key: 'booking', label: t('patient.tab_booking') },
     { key: 'appointments', label: t('patient.tab_appointments') },
@@ -375,8 +355,8 @@ function dashboardPatient(user) {
   ];
   const active = S.activeTab.patient || 'booking';
   let content = '';
-  if (active === 'booking') content = patientBookingTab(user);
-  else if (active === 'appointments') content = patientAppointmentsTab(user);
+  if (active === 'booking') content = await patientBookingTab(user);
+  else if (active === 'appointments') content = await patientAppointmentsTab(user);
   else content = settingsTab(user);
 
   return `
@@ -387,9 +367,8 @@ function dashboardPatient(user) {
   `;
 }
 
-function patientBookingTab(user) {
-  const doctors = db.getUsersByRole('doctor');
-  const bookings = db.getBookings();
+async function patientBookingTab(user) {
+  const [doctors, bookings, currency] = await Promise.all([db.getUsersByRole('doctor'), db.getBookings(), db.getCurrency()]);
   const filterId = S.booking.filterDoctorId;
   const viewYear = S.booking.viewYear;
   const viewMonth = S.booking.viewMonth;
@@ -432,7 +411,7 @@ function patientBookingTab(user) {
 
   let treatmentBlock = '';
   if (S.booking.selectedDate && S.booking.selectedSlot != null) {
-    const treatments = db.getTreatments();
+    const treatments = await db.getTreatments();
     treatmentBlock = `
       <label>${t('booking.choose_service')}
         <select data-onchange="select-treatment">
@@ -449,8 +428,9 @@ function patientBookingTab(user) {
         const fits = candidateDoctors.some((docId) =>
           cal.isSlotFreeForDoctor(bookings, docId, S.booking.selectedDate, S.booking.selectedSlot, Number(tx.duracionMin))
         );
+        const symbol = (CURRENCIES[currency] && CURRENCIES[currency].symbol) || '$';
         treatmentBlock += `
-          <p><strong>${t('booking.estimated_duration')}:</strong> ${tx.duracionMin} ${t('booking.minutes')} · <strong>${t('booking.estimated_price')}:</strong> ${formatMoney(tx.precio)}</p>
+          <p><strong>${t('booking.estimated_duration')}:</strong> ${tx.duracionMin} ${t('booking.minutes')} · <strong>${t('booking.estimated_price')}:</strong> ${symbol}${tx.precio}</p>
           ${fits
             ? `<button class="btn btn-accept btn-block" data-action="confirm-booking">${t('booking.btn_confirm')}</button>`
             : `<p class="notice">${t('booking.no_slot_selected')}</p>`}
@@ -488,15 +468,18 @@ function patientBookingTab(user) {
   `;
 }
 
-function patientAppointmentsTab(user) {
-  const bookings = db.getBookingsForPatient(user.id).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+async function patientAppointmentsTab(user) {
+  const [bookingsRaw, treatments, doctors] = await Promise.all([
+    db.getBookingsForPatient(user.id),
+    db.getTreatments(),
+    db.getUsersByRole('doctor'),
+  ]);
+  const bookings = bookingsRaw.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
   if (bookings.length === 0) return `<p class="muted">${t('appointments.empty')}</p>`;
-
-  const treatments = db.getTreatments();
 
   return bookings
     .map((b) => {
-      const doctor = db.getUserById(b.doctorId);
+      const doctor = doctors.find((d) => d.id === b.doctorId);
       const tx = treatments.find((x) => x.id === b.treatmentId);
       const badgeClass = { pendiente: 'badge-pending', reasignada: 'badge-pending', aprobada: 'badge-approved', rechazada: 'badge-denied', cancelada: 'badge-denied', completada: 'badge-done' }[b.status];
 
@@ -538,7 +521,7 @@ function patientAppointmentsTab(user) {
 // ---------------------------------------------------------------
 // DOCTOR
 // ---------------------------------------------------------------
-function dashboardDoctor(user) {
+async function dashboardDoctor(user) {
   const tabs = [
     { key: 'agenda', label: t('doctor.tab_agenda') },
     { key: 'patients', label: t('doctor.tab_patients') },
@@ -546,8 +529,8 @@ function dashboardDoctor(user) {
   ];
   const active = S.activeTab.doctor || 'agenda';
   let content = '';
-  if (active === 'agenda') content = doctorAgendaTab(user);
-  else if (active === 'patients') content = doctorPatientsTab(user);
+  if (active === 'agenda') content = await doctorAgendaTab(user);
+  else if (active === 'patients') content = await doctorPatientsTab(user);
   else content = settingsTab(user);
 
   return `
@@ -558,11 +541,15 @@ function dashboardDoctor(user) {
   `;
 }
 
-function doctorAgendaTab(user) {
-  const bookings = db.getBookingsForDoctor(user.id).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+async function doctorAgendaTab(user) {
+  const [bookingsRaw, treatments, openRequests, patients] = await Promise.all([
+    db.getBookingsForDoctor(user.id),
+    db.getTreatments(),
+    db.getChangeRequests(),
+    db.getUsersByRole('patient'),
+  ]);
+  const bookings = bookingsRaw.sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
   if (bookings.length === 0) return `<p class="muted">${t('agenda.empty')}</p>`;
-  const treatments = db.getTreatments();
-  const openRequests = db.getChangeRequests();
 
   return `
     <h2>${t('agenda.title')}</h2>
@@ -571,7 +558,7 @@ function doctorAgendaTab(user) {
       <tbody>
         ${bookings
           .map((b) => {
-            const patient = db.getUserById(b.patientId);
+            const patient = patients.find((p) => p.id === b.patientId);
             const tx = treatments.find((x) => x.id === b.treatmentId);
             const badgeClass = { pendiente: 'badge-pending', reasignada: 'badge-pending', aprobada: 'badge-approved', rechazada: 'badge-denied', cancelada: 'badge-denied', completada: 'badge-done' }[b.status];
             const hasOpenRequest = openRequests.some((r) => r.bookingId === b.id && r.status === 'pendiente');
@@ -601,10 +588,13 @@ function doctorAgendaTab(user) {
   `;
 }
 
-function doctorPatientsTab(user) {
-  const bookings = db.getBookingsForDoctor(user.id);
+async function doctorPatientsTab(user) {
+  const [bookings, ratings, patients] = await Promise.all([
+    db.getBookingsForDoctor(user.id),
+    db.getRatingsForDoctor(user.id),
+    db.getUsersByRole('patient'),
+  ]);
   const patientIds = [...new Set(bookings.map((b) => b.patientId))];
-  const ratings = db.getRatingsForDoctor(user.id);
   const avg = ratings.length ? (ratings.reduce((s, r) => s + Number(r.stars), 0) / ratings.length).toFixed(1) : null;
 
   const ratingsSummary = `<p><strong>${t('patients.ratings')}:</strong> ${avg ? `${avg} / 5 (${ratings.length})` : '—'}</p>`;
@@ -613,7 +603,7 @@ function doctorPatientsTab(user) {
 
   const rows = patientIds
     .map((pid) => {
-      const p = db.getUserById(pid);
+      const p = patients.find((x) => x.id === pid);
       if (!p) return '';
       return `<tr><td>${p.nombre} ${p.apellidos}</td><td>${p.edad ?? '—'}</td><td>${p.telefono}</td><td>${p.email}</td></tr>`;
     })
@@ -621,7 +611,7 @@ function doctorPatientsTab(user) {
 
   const notesRows = ratings
     .map((r) => {
-      const patient = db.getUserById(r.patientId);
+      const patient = patients.find((x) => x.id === r.patientId);
       const who = r.anonymous ? '—' : patient ? patient.nombre : '—';
       return `<tr><td>${'★'.repeat(Number(r.stars))}</td><td>${who}</td><td>${r.note || ''}</td></tr>`;
     })
@@ -641,7 +631,7 @@ function doctorPatientsTab(user) {
 // ---------------------------------------------------------------
 // ADMIN
 // ---------------------------------------------------------------
-function dashboardAdmin(user) {
+async function dashboardAdmin(user) {
   const tabs = [
     { key: 'treatments', label: t('admin.tab_treatments') },
     { key: 'doctors', label: t('admin.tab_doctors') },
@@ -651,10 +641,10 @@ function dashboardAdmin(user) {
   ];
   const active = S.activeTab.admin || 'treatments';
   let content = '';
-  if (active === 'treatments') content = adminTreatmentsTab();
-  else if (active === 'doctors') content = adminDoctorsTab();
-  else if (active === 'requests') content = adminRequestsTab();
-  else if (active === 'patients') content = adminPatientsTab();
+  if (active === 'treatments') content = await adminTreatmentsTab();
+  else if (active === 'doctors') content = await adminDoctorsTab();
+  else if (active === 'requests') content = await adminRequestsTab();
+  else if (active === 'patients') content = await adminPatientsTab();
   else content = settingsTab(user);
 
   return `
@@ -665,9 +655,8 @@ function dashboardAdmin(user) {
   `;
 }
 
-function adminTreatmentsTab() {
-  const treatments = db.getTreatments();
-  const currentCurrency = db.getCurrency();
+async function adminTreatmentsTab() {
+  const [treatments, currentCurrency] = await Promise.all([db.getTreatments(), db.getCurrency()]);
   return `
     <h2>${t('treatments.title')}</h2>
     <label style="max-width:220px;">${t('treatments.currency')}
@@ -688,18 +677,27 @@ function adminTreatmentsTab() {
         ? `<p class="muted">${t('treatments.list_empty')}</p>`
         : `<table>
             <thead><tr><th>${t('treatments.name')}</th><th>${t('treatments.duration')}</th><th>${t('treatments.price')}</th></tr></thead>
-            <tbody>${treatments.map((tx) => `<tr><td>${tx.nombre}</td><td>${tx.duracionMin} ${t('booking.minutes')}</td><td>${formatMoney(tx.precio)}</td></tr>`).join('')}</tbody>
+            <tbody>${treatments
+              .map((tx) => {
+                const symbol = (CURRENCIES[currentCurrency] && CURRENCIES[currentCurrency].symbol) || '$';
+                return `<tr><td>${tx.nombre}</td><td>${tx.duracionMin} ${t('booking.minutes')}</td><td>${symbol}${tx.precio}</td></tr>`;
+              })
+              .join('')}</tbody>
           </table>`
     }
   `;
 }
 
-function adminDoctorsTab() {
-  const doctors = db.getUsersByRole('doctor');
+async function adminDoctorsTab() {
+  const [doctors, treatments, patients, allBookings] = await Promise.all([
+    db.getUsersByRole('doctor'),
+    db.getTreatments(),
+    db.getUsersByRole('patient'),
+    db.getBookings(),
+  ]);
   if (doctors.length === 0) return `<p class="muted">${t('doctors.list_empty')}</p>`;
-  const treatments = db.getTreatments();
   const slots = cal.generateSlotStarts();
-  const ctx = { doctors, treatments, slots };
+  const ctx = { doctors, patients, treatments, slots };
 
   return `
     <h2>${t('doctors.title')}</h2>
@@ -711,9 +709,8 @@ function adminDoctorsTab() {
             const expanded = S.adminUI.expandedDoctorId === d.id;
             let agendaBlock = '';
             if (expanded) {
-              const bookings = db
-                .getBookingsForDoctor(d.id)
-                .filter((b) => ['pendiente', 'reasignada', 'aprobada'].includes(b.status))
+              const bookings = allBookings
+                .filter((b) => b.doctorId === d.id && ['pendiente', 'reasignada', 'aprobada'].includes(b.status))
                 .sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
               agendaBlock = bookings.length
                 ? `<table>
@@ -739,9 +736,10 @@ function adminDoctorsTab() {
 
 // Fila reutilizable de una cita, con sus acciones según el estado —
 // usada tanto en la cola de solicitudes como en la agenda expandida de un doctor.
-function renderBookingRow(b, { doctors, treatments, slots }) {
-  const patient = db.getUserById(b.patientId);
-  const doctor = db.getUserById(b.doctorId);
+// (Totalmente sincrónica: doctors/patients/treatments ya vienen pre-cargados en ctx.)
+function renderBookingRow(b, { doctors, patients, treatments, slots }) {
+  const patient = patients.find((p) => p.id === b.patientId);
+  const doctor = doctors.find((d) => d.id === b.doctorId);
   const tx = treatments.find((x) => x.id === b.treatmentId);
   const badgeClass = { pendiente: 'badge-pending', reasignada: 'badge-pending', aprobada: 'badge-approved', rechazada: 'badge-denied', cancelada: 'badge-denied', completada: 'badge-done' }[b.status];
   const reassignOpen = S.adminUI.reassignOpenFor === b.id;
@@ -796,23 +794,28 @@ function renderBookingRow(b, { doctors, treatments, slots }) {
   return mainRow + reassignRow + rescheduleRow;
 }
 
-function adminRequestsTab() {
-  const bookings = db.getBookings().filter((b) => ['pendiente', 'reasignada', 'aprobada'].includes(b.status));
-  const doctors = db.getUsersByRole('doctor');
-  const treatments = db.getTreatments();
+async function adminRequestsTab() {
+  const [allBookings, doctors, patients, treatments, changeRequestsRaw] = await Promise.all([
+    db.getBookings(),
+    db.getUsersByRole('doctor'),
+    db.getUsersByRole('patient'),
+    db.getTreatments(),
+    db.getChangeRequests(),
+  ]);
   const slots = cal.generateSlotStarts();
-  const ctx = { doctors, treatments, slots };
+  const ctx = { doctors, patients, treatments, slots };
+  const activeBookings = allBookings.filter((b) => ['pendiente', 'reasignada', 'aprobada'].includes(b.status));
 
-  const pendingRows = bookings.length
-    ? bookings.map((b) => renderBookingRow(b, ctx)).join('')
+  const pendingRows = activeBookings.length
+    ? activeBookings.map((b) => renderBookingRow(b, ctx)).join('')
     : `<tr><td colspan="6" class="muted">${t('requests.empty')}</td></tr>`;
 
-  const changeRequests = db.getChangeRequests().filter((r) => r.status === 'pendiente');
+  const changeRequests = changeRequestsRaw.filter((r) => r.status === 'pendiente');
   const changeRows = changeRequests.length
     ? changeRequests
         .map((r) => {
-          const booking = db.getBookings().find((b) => b.id === r.bookingId);
-          const doctor = db.getUserById(r.doctorId);
+          const booking = allBookings.find((b) => b.id === r.bookingId);
+          const doctor = doctors.find((d) => d.id === r.doctorId);
           return `<tr>
             <td>${doctor ? doctor.nombre + ' ' + doctor.apellidos : ''}</td>
             <td>${booking ? formatDate(booking.date) + ' ' + booking.startTime : '—'}</td>
@@ -839,8 +842,8 @@ function adminRequestsTab() {
   `;
 }
 
-function adminPatientsTab() {
-  const patients = db.getUsersByRole('patient');
+async function adminPatientsTab() {
+  const [patients, intakeMap] = await Promise.all([db.getUsersByRole('patient'), db.getAllIntakes()]);
   if (patients.length === 0) return `<p class="muted">${t('adminpatients.empty')}</p>`;
   return `
     <h2>${t('adminpatients.title')}</h2>
@@ -849,7 +852,7 @@ function adminPatientsTab() {
       <tbody>
         ${patients
           .map((p) => {
-            const intake = db.getIntake(p.id);
+            const intake = intakeMap[p.id];
             const editing = S.adminUI.editingPatientId === p.id;
             const row = `<tr>
               <td>${p.nombre} ${p.apellidos}</td><td>${p.edad ?? '—'}</td><td>${p.telefono}</td><td>${p.email}</td>
@@ -864,7 +867,6 @@ function adminPatientsTab() {
                     <label>${t('register.lastname')}<input type="text" name="apellidos" value="${p.apellidos}" required /></label>
                     <label>${t('settings.age')}<input type="number" name="edad" value="${p.edad ?? ''}" /></label>
                     <label>${t('settings.phone')}<input type="tel" name="telefono" value="${p.telefono}" required /></label>
-                    <label>${t('settings.email')}<input type="email" name="email" value="${p.email}" required /></label>
                     <button type="submit" class="btn btn-accept btn-sm">${t('common.save')}</button>
                     <button type="button" class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('common.cancel')}</button>
                   </form>
@@ -882,7 +884,6 @@ function adminPatientsTab() {
 // Ajustes (compartido por los 3 roles)
 // ---------------------------------------------------------------
 function settingsTab(user) {
-  const session = db.getSession();
   return `
     <h2>${t('settings.title')}</h2>
     <form data-form="settings">
@@ -891,7 +892,7 @@ function settingsTab(user) {
         <label>${t('settings.age')}<input type="number" name="edad" value="${user.edad ?? ''}" /></label>
       </div>
       <div class="field-row">
-        <label>${t('settings.email')}<input type="email" name="email" value="${user.email}" /></label>
+        <label>${t('settings.email')}<input type="email" value="${user.email}" disabled /></label>
         <label>${t('settings.phone')}<input type="tel" name="telefono" value="${user.telefono}" /></label>
       </div>
       <label>${t('settings.language')}
@@ -899,7 +900,6 @@ function settingsTab(user) {
           ${LANGS.map((l) => `<option value="${l}" ${l === getLang() ? 'selected' : ''}>${l.toUpperCase()}</option>`).join('')}
         </select>
       </label>
-      <label><input type="checkbox" name="keepLogin" style="width:auto;" ${session?.keepLogin ? 'checked' : ''} /> ${t('settings.keep_login')}</label>
       <button type="submit" class="btn btn-accept btn-block">${t('settings.btn_save')}</button>
     </form>
   `;
@@ -908,30 +908,21 @@ function settingsTab(user) {
 // ---------------------------------------------------------------
 // Helpers de negocio
 // ---------------------------------------------------------------
-function getOrCreateDemoUser(role) {
-  const existing = db.getUsersByRole(role);
-  if (existing.length > 0) return existing[existing.length - 1];
-  const demoNames = { patient: ['Ramón', 'Demo'], doctor: ['Heriberto', 'Demo'], admin: ['Ana', 'Demo'] };
-  const [nombre, apellidos] = demoNames[role];
-  return db.saveUser({
-    role,
-    nombre,
-    apellidos,
-    telefono: '000-0000',
-    email: `${role}.demo@example.com`,
-    ...(role === 'doctor' ? { especialidad: 'General' } : {}),
-    ...(role === 'patient' ? { edad: 30, clienteTipo: 'nuevo' } : {}),
-  });
-}
-
 function resetBookingFlow() {
-  S.booking = { filterDoctorId: '', selectedDate: null, selectedSlot: null, treatmentId: '' };
+  S.booking = {
+    filterDoctorId: '',
+    selectedDate: null,
+    selectedSlot: null,
+    treatmentId: '',
+    viewYear: new Date().getFullYear(),
+    viewMonth: new Date().getMonth(),
+  };
 }
 
 // ---------------------------------------------------------------
 // Delegación de eventos
 // ---------------------------------------------------------------
-function onClick(e) {
+async function onClick(e) {
   const el = e.target.closest('[data-action]');
   if (!el) return;
   const action = el.dataset.action;
@@ -944,16 +935,21 @@ function onClick(e) {
   }
 
   if (action === 'logout') {
-    db.clearSession();
+    await db.signOut();
     resetBookingFlow();
     return goto('#/welcome');
   }
 
-  if (action === 'login-as') {
-    const user = db.getUserById(el.dataset.user);
-    if (!user) return;
-    db.setSession({ userId: user.id, role: user.role });
-    return goto(user.role === 'patient' && !db.getIntake(user.id) ? '#/intake' : '#/dashboard');
+  if (action === 'forgot-password') {
+    const email = prompt(t('login.enter_email_prompt'));
+    if (!email) return;
+    try {
+      await db.resetPassword(email);
+      S.notice = t('login.reset_sent');
+    } catch (err) {
+      S.notice = err.message;
+    }
+    return render();
   }
 
   if (action === 'set-tab') {
@@ -1008,15 +1004,13 @@ function onClick(e) {
   }
 
   if (action === 'mark-attended') {
-    db.updateBooking(el.dataset.booking, { status: 'completada' });
+    await db.updateBooking(el.dataset.booking, { status: 'completada' });
     return render();
   }
 
   if (action === 'request-change') {
-    const session = db.getSession();
-    const doctor = db.getUserById(session.userId);
-    if (!doctor?.canRequestChanges) return render();
-    db.addChangeRequest({ bookingId: el.dataset.booking, doctorId: session.userId });
+    if (!authUser?.canRequestChanges) return render();
+    await db.addChangeRequest({ bookingId: el.dataset.booking, doctorId: authUser.id });
     S.notice = t('agenda.request_sent');
     return render();
   }
@@ -1027,17 +1021,17 @@ function onClick(e) {
   }
 
   if (action === 'approve-booking') {
-    db.updateBooking(el.dataset.booking, { status: 'aprobada' });
+    await db.updateBooking(el.dataset.booking, { status: 'aprobada' });
     return render();
   }
 
   if (action === 'deny-booking') {
-    db.updateBooking(el.dataset.booking, { status: 'rechazada' });
+    await db.updateBooking(el.dataset.booking, { status: 'rechazada' });
     return render();
   }
 
   if (action === 'cancel-booking') {
-    db.updateBooking(el.dataset.booking, { status: 'cancelada' });
+    await db.updateBooking(el.dataset.booking, { status: 'cancelada' });
     return render();
   }
 
@@ -1060,7 +1054,7 @@ function onClick(e) {
 
   if (action === 'confirm-reassign') {
     const select = document.querySelector(`[data-select="reassign-doctor"][data-booking="${el.dataset.booking}"]`);
-    if (select) db.updateBooking(el.dataset.booking, { doctorId: select.value, status: 'reasignada' });
+    if (select) await db.updateBooking(el.dataset.booking, { doctorId: select.value, status: 'reasignada' });
     S.adminUI.reassignOpenFor = null;
     return render();
   }
@@ -1068,37 +1062,41 @@ function onClick(e) {
   if (action === 'confirm-reschedule') {
     const dateInput = document.querySelector(`[data-select="reschedule-date"][data-booking="${el.dataset.booking}"]`);
     const timeSelect = document.querySelector(`[data-select="reschedule-time"][data-booking="${el.dataset.booking}"]`);
-    const booking = db.getBookings().find((b) => b.id === el.dataset.booking);
-    if (dateInput && timeSelect && booking) {
-      const durationMin = cal.timeToMinutes(booking.endTime) - cal.timeToMinutes(booking.startTime);
-      const startMin = Number(timeSelect.value);
-      db.updateBooking(el.dataset.booking, {
-        date: dateInput.value,
-        startTime: cal.minutesToTime(startMin),
-        endTime: cal.minutesToTime(startMin + durationMin),
-        status: 'reasignada',
-      });
+    if (dateInput && timeSelect) {
+      const bookings = await db.getBookings();
+      const booking = bookings.find((b) => b.id === el.dataset.booking);
+      if (booking) {
+        const durationMin = cal.timeToMinutes(booking.endTime) - cal.timeToMinutes(booking.startTime);
+        const startMin = Number(timeSelect.value);
+        await db.updateBooking(el.dataset.booking, {
+          date: dateInput.value,
+          startTime: cal.minutesToTime(startMin),
+          endTime: cal.minutesToTime(startMin + durationMin),
+          status: 'reasignada',
+        });
+      }
     }
     S.adminUI.rescheduleOpenFor = null;
     return render();
   }
 
   if (action === 'approve-change') {
-    const req = db.getChangeRequests().find((r) => r.id === el.dataset.request);
+    const requests = await db.getChangeRequests();
+    const req = requests.find((r) => r.id === el.dataset.request);
     if (req) {
-      db.updateChangeRequest(req.id, { status: 'aprobada' });
-      db.updateBooking(req.bookingId, { status: 'cancelada' });
+      await db.updateChangeRequest(req.id, { status: 'aprobada' });
+      await db.updateBooking(req.bookingId, { status: 'cancelada' });
     }
     return render();
   }
 
   if (action === 'deny-change') {
-    db.updateChangeRequest(el.dataset.request, { status: 'rechazada' });
+    await db.updateChangeRequest(el.dataset.request, { status: 'rechazada' });
     return render();
   }
 }
 
-function onChange(e) {
+async function onChange(e) {
   const el = e.target.closest('[data-onchange]');
   if (!el) return;
   const action = el.dataset.onchange;
@@ -1117,25 +1115,24 @@ function onChange(e) {
   }
 
   if (action === 'set-currency') {
-    db.setCurrency(el.value);
+    await db.setCurrency(el.value);
     return render();
   }
 
   if (action === 'toggle-doctor-permission') {
-    db.updateUser(el.dataset.doctor, { canRequestChanges: el.checked });
+    await db.updateUser(el.dataset.doctor, { canRequestChanges: el.checked });
     return render();
   }
 }
 
-function handleConfirmBooking() {
-  const session = db.getSession();
-  const treatments = db.getTreatments();
+async function handleConfirmBooking() {
+  const treatments = await db.getTreatments();
   const tx = treatments.find((x) => x.id === S.booking.treatmentId);
   if (!tx) return;
 
-  const doctors = db.getUsersByRole('doctor');
+  const doctors = await db.getUsersByRole('doctor');
   const candidateIds = S.booking.filterDoctorId ? [S.booking.filterDoctorId] : doctors.map((d) => d.id);
-  const bookings = db.getBookings();
+  const bookings = await db.getBookings();
   const doctorId = candidateIds.find((docId) =>
     cal.isSlotFreeForDoctor(bookings, docId, S.booking.selectedDate, S.booking.selectedSlot, Number(tx.duracionMin))
   );
@@ -1145,8 +1142,8 @@ function handleConfirmBooking() {
   }
 
   const endMin = S.booking.selectedSlot + Number(tx.duracionMin);
-  db.addBooking({
-    patientId: session.userId,
+  await db.addBooking({
+    patientId: authUser.id,
     doctorId,
     treatmentId: tx.id,
     date: S.booking.selectedDate,
@@ -1157,10 +1154,10 @@ function handleConfirmBooking() {
   resetBookingFlow();
   S.notice = t('booking.confirmed_msg');
   S.activeTab.patient = 'appointments';
-  render();
+  return render();
 }
 
-function onSubmit(e) {
+async function onSubmit(e) {
   const form = e.target.closest('form[data-form]');
   if (!form) return;
   e.preventDefault();
@@ -1168,52 +1165,64 @@ function onSubmit(e) {
   const data = Object.fromEntries(new FormData(form).entries());
 
   if (type === 'login') {
-    const input = data.username.trim();
-    const map = { '1': 'patient', '2': 'doctor', '3': 'admin' };
-
-    if (map[input]) {
-      const role = map[input];
-      const user = getOrCreateDemoUser(role);
-      db.setSession({ userId: user.id, role });
-      return goto(role === 'patient' && !db.getIntake(user.id) ? '#/intake' : '#/dashboard');
+    try {
+      await db.signIn({ email: data.email, password: data.password });
+      return goto('#/dashboard');
+    } catch (err) {
+      S.notice = err.message;
+      return render();
     }
-
-    const byEmail = db.getUsers().find((u) => u.email.toLowerCase() === input.toLowerCase());
-    if (byEmail) {
-      db.setSession({ userId: byEmail.id, role: byEmail.role });
-      return goto(byEmail.role === 'patient' && !db.getIntake(byEmail.id) ? '#/intake' : '#/dashboard');
-    }
-
-    S.notice = t('login.not_found');
-    return render();
   }
 
   if (type === 'register') {
     const role = form.dataset.role;
-    const user = db.saveUser({ role, ...data });
-    db.setSession({ userId: user.id, role });
-    return goto(role === 'patient' ? '#/intake' : '#/dashboard');
+    try {
+      const result = await db.signUp({
+        email: data.email,
+        password: data.password,
+        role,
+        nombre: data.nombre,
+        apellidos: data.apellidos,
+        telefono: data.telefono,
+        especialidad: data.especialidad,
+        edad: data.edad,
+        clienteTipo: data.clienteTipo,
+      });
+      if (result.session) {
+        return goto(role === 'patient' ? '#/intake' : '#/dashboard');
+      }
+      S.notice = t('register.confirm_email_notice');
+      return goto('#/login');
+    } catch (err) {
+      S.notice = err.message;
+      return render();
+    }
   }
 
   if (type === 'intake') {
-    const session = db.getSession();
-    db.saveIntake(session.userId, data);
-    db.updateUser(session.userId, { edad: data.edad });
+    await db.saveIntake(authUser.id, {
+      edad: data.edad,
+      condiciones: data.condiciones,
+      fuma: data.fuma,
+      alergias: data.alergias,
+      medicamentos: data.medicamentos,
+    });
+    await db.updateUser(authUser.id, { edad: data.edad });
+    authUser = { ...authUser, edad: Number(data.edad) };
     return goto('#/dashboard');
   }
 
   if (type === 'add-treatment') {
-    db.addTreatment(data);
+    await db.addTreatment(data);
     return render();
   }
 
   if (type === 'edit-patient') {
-    db.updateUser(form.dataset.patient, {
+    await db.updateUser(form.dataset.patient, {
       nombre: data.nombre,
       apellidos: data.apellidos,
       edad: data.edad,
       telefono: data.telefono,
-      email: data.email,
     });
     S.adminUI.editingPatientId = null;
     S.notice = t('settings.saved_msg');
@@ -1221,31 +1230,25 @@ function onSubmit(e) {
   }
 
   if (type === 'settings') {
-    const session = db.getSession();
     const [nombre, ...rest] = data.nombre.split(' ');
-    db.updateUser(session.userId, {
-      nombre,
-      apellidos: rest.join(' '),
-      email: data.email,
-      telefono: data.telefono,
-      edad: data.edad,
-    });
+    const apellidos = rest.join(' ');
+    await db.updateUser(authUser.id, { nombre, apellidos, telefono: data.telefono, edad: data.edad });
+    authUser = { ...authUser, nombre, apellidos, telefono: data.telefono, edad: Number(data.edad) };
     setLang(data.idioma);
-    db.setSession({ ...session, keepLogin: !!data.keepLogin });
     S.notice = t('settings.saved_msg');
     return render();
   }
 
   if (type === 'rate') {
-    db.addRating({
+    await db.addRating({
       doctorId: form.dataset.doctor,
       bookingId: form.dataset.booking,
-      patientId: db.getSession().userId,
+      patientId: authUser.id,
       stars: data.stars,
       note: data.note,
       anonymous: !!data.anonymous,
     });
-    db.updateBooking(form.dataset.booking, { ratedByPatient: true });
+    await db.updateBooking(form.dataset.booking, { ratedByPatient: true });
     S.ratingOpenFor = null;
     S.notice = t('appointments.rating_saved');
     return render();

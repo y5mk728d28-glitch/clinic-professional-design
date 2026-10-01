@@ -5,9 +5,10 @@ Diseñada como una base reutilizable: el motor (agenda, cuentas, catálogo de
 tratamientos, notificaciones) es genérico; lo que cambia por negocio vive en
 `js/config.js` y en la paleta de `css/styles.css`.
 
-Estado actual: **maqueta funcional con datos simulados** (todo se guarda en
-`localStorage` del navegador). No hay backend ni login real todavía —
-es la fase de diseño/UX antes de conectar un servidor.
+Estado actual: **backend real conectado** (Supabase — base de datos +
+autenticación). Login real con correo/contraseña, con verificación de correo
+automática al registrarse. Los datos se sincronizan entre cualquier
+dispositivo que abra la app, ya no viven solo en el navegador.
 
 ## Cómo probarla
 
@@ -19,39 +20,53 @@ python3 -m http.server 8080
 # abre http://localhost:8080
 ```
 
-(Abrir `index.html` directamente con doble clic también funciona, salvo el
-Service Worker que necesita http/https).
+También funciona desde GitHub Pages o cualquier hosting estático.
 
-### Login de prueba (mock)
+**Importante**: no la pruebes dentro de una vista previa tipo "Artifact" de
+Claude — ese entorno bloquea las conexiones salientes al backend real
+(Supabase), así que el login y los datos no van a funcionar ahí. Usa un
+servidor local o la URL publicada.
 
-En la pantalla de "Iniciar sesión", el usuario decide el rol:
+### Configurar el backend (una sola vez)
 
-| Usuario | Rol                        |
-|---------|-----------------------------|
-| `1`     | Paciente                    |
-| `2`     | Doctor                      |
-| `3`     | Administrador / Recepcionista |
+1. Crea un proyecto en [supabase.com](https://supabase.com) (plan gratis)
+2. En el **SQL Editor** del proyecto, pega y ejecuta todo el contenido de
+   [`supabase/schema.sql`](supabase/schema.sql) — crea las tablas, la
+   seguridad a nivel de fila (RLS) y el trigger que arma el perfil de cada
+   usuario al registrarse
+3. En **Settings → API**, copia el "Project URL" y la clave "anon public" /
+   "publishable" (nunca la "service_role", esa es secreta)
+4. Pégalos en `js/supabaseClient.js` (`SUPABASE_URL` y
+   `SUPABASE_PUBLISHABLE_KEY`)
 
-La contraseña acepta cualquier valor. Si no hay una cuenta registrada de ese
-rol, se crea automáticamente una cuenta demo para poder navegar el dashboard.
+### Primer uso
+
+En la pantalla de bienvenida: "Crear cuenta" → elige rol → completa el
+formulario (el correo y la contraseña son las credenciales reales de login).
+Según la configuración del proyecto de Supabase, puede pedir confirmar el
+correo antes de poder iniciar sesión. "¿Olvidaste tu contraseña?" en el login
+envía un correo de recuperación.
 
 ## Roles
 
 - **Paciente**: calendario de disponibilidad (azul = disponible, rojo =
-  completo, blanco = no disponible), filtro por doctor, selección de
+  completo, blanco = no disponible, verde = día en que fue atendido),
+  navegación entre meses pasados/futuros, filtro por doctor, selección de
   tratamiento con precio/duración estimados, historial de citas y
   calificación al doctor tras la cita.
 - **Doctor**: agenda con sus citas (sincronizada con las reservas de
   pacientes — un horario ocupado no puede volver a reservarse), solicitud de
-  cambio/cancelación hacia el administrador, lista de pacientes atendidos y
-  su calificación promedio.
+  cambio/cancelación hacia el administrador (solo si el admin se lo habilitó
+  primero), lista de pacientes atendidos y su calificación promedio.
 - **Administrador / Recepcionista**: catálogo de tratamientos (nombre,
-  duración, precio), roster de doctores con su agenda, cola de solicitudes
-  de citas (aprobar, denegar, reasignar doctor, reprogramar), listado de
-  pacientes y sus datos (sin contraseñas).
+  duración, precio) con moneda configurable, roster de doctores con su
+  agenda y el permiso de "puede cancelar/reprogramar" por doctor, cola de
+  solicitudes de citas (aprobar, denegar, reasignar doctor, reprogramar —
+  también sobre citas ya aprobadas), listado de pacientes editable (sin
+  contraseñas).
 
-Cada rol comparte una pestaña de **Ajustes** (nombre, correo, teléfono,
-idioma, edad, mantener sesión iniciada).
+Cada rol comparte una pestaña de **Ajustes** (nombre, teléfono, idioma —
+el correo no es editable ahí porque es la credencial de login real).
 
 ## Idiomas
 
@@ -71,20 +86,26 @@ Los tokens están centralizados en `css/styles.css` (`:root`).
 ## Estructura
 
 ```
-index.html          Shell de la app (SPA con enrutado por hash)
-css/styles.css       Paleta, componentes, layout
-js/app.js            Vistas, enrutado y lógica de UI
-js/i18n.js           Traducciones (es/en/de)
-js/db.js             Persistencia simulada (localStorage) — capa a
-                     reemplazar por API real cuando exista backend
-js/calendar.js       Generación de calendario y franjas horarias
-js/config.js         Configuración por negocio (nombre, textos variables)
-manifest.json, sw.js Soporte PWA (instalar en pantalla de inicio)
+index.html             Shell de la app (SPA con enrutado por hash)
+css/styles.css          Paleta, componentes, layout
+js/app.js               Vistas, enrutado y lógica de UI (async, Supabase)
+js/i18n.js              Traducciones (es/en/de)
+js/db.js                Acceso a datos — Supabase (auth + base de datos)
+js/supabaseClient.js    Credenciales de conexión al proyecto de Supabase
+js/calendar.js          Generación de calendario y franjas horarias
+js/config.js            Configuración por negocio (nombre, moneda, íconos)
+supabase/schema.sql     Tablas, seguridad (RLS) y trigger de registro
+manifest.json, sw.js    Soporte PWA (instalar en pantalla de inicio)
 ```
 
 ## Próximos pasos
 
-- Video explicativo de instalación PWA en la pantalla de bienvenida.
-- Backend real + autenticación (reemplazar `js/db.js`).
+- Video real de instalación (reemplazar la simulación animada por una
+  grabación de pantalla real, Android y iPhone).
+- Envío de SMS (requiere conectar una cuenta de Twilio).
+- Catálogo de servicios visible a todos, con permisos por paciente sobre
+  cuáles puede solicitar (pendiente de definir con la clínica).
+- Formulario de intake "real" de la clínica, con historial de versiones si
+  se permite que el paciente lo edite.
 - Sección de preguntas y respuestas.
 - Posible 4to rol por encima del administrador (dueño/jefe).

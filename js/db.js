@@ -1,171 +1,285 @@
-// Capa de persistencia simulada (localStorage). El día que exista backend real,
-// solo esta capa se reemplaza por llamadas fetch/API — el resto de la app no debe cambiar.
+// Capa de acceso a datos — ahora respaldada por Supabase (backend real) en
+// vez de localStorage. El resto de la app (app.js) no sabe ni le importa que
+// esto sea Supabase: solo llama a estas funciones.
+import { supabase } from './supabaseClient.js';
 
-const KEYS = {
-  users: 'cpd_users',
-  session: 'cpd_session',
-  treatments: 'cpd_treatments',
-  bookings: 'cpd_bookings',
-  intake: 'cpd_intake',
-  ratings: 'cpd_ratings',
-  changeRequests: 'cpd_change_requests',
-  currency: 'cpd_currency',
-};
+// ---------- Mapeo snake_case (DB) <-> camelCase (app) ----------
 
-function read(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+function mapProfile(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    role: row.role,
+    nombre: row.nombre,
+    apellidos: row.apellidos,
+    telefono: row.telefono,
+    email: row.email,
+    especialidad: row.especialidad,
+    edad: row.edad,
+    clienteTipo: row.cliente_tipo,
+    canRequestChanges: row.can_request_changes,
+    createdAt: row.created_at,
+  };
 }
 
-function write(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+function mapBooking(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    doctorId: row.doctor_id,
+    treatmentId: row.treatment_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    status: row.status,
+    ratedByPatient: row.rated_by_patient,
+  };
 }
 
-function uid(prefix) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function mapTreatment(row) {
+  if (!row) return null;
+  return { id: row.id, nombre: row.nombre, duracionMin: row.duracion_min, precio: row.precio };
 }
 
-// ---------- Users ----------
-
-export function getUsers() {
-  return read(KEYS.users, []);
+function mapIntake(row) {
+  if (!row) return null;
+  return {
+    edad: row.edad,
+    condiciones: row.condiciones,
+    fuma: row.fuma,
+    alergias: row.alergias,
+    medicamentos: row.medicamentos,
+  };
 }
 
-export function getUsersByRole(role) {
-  return getUsers().filter((u) => u.role === role);
+function mapChangeRequest(row) {
+  if (!row) return null;
+  return { id: row.id, bookingId: row.booking_id, doctorId: row.doctor_id, status: row.status };
 }
 
-export function getUserById(id) {
-  return getUsers().find((u) => u.id === id) || null;
+function mapRating(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    doctorId: row.doctor_id,
+    bookingId: row.booking_id,
+    patientId: row.patient_id,
+    stars: row.stars,
+    note: row.note,
+    anonymous: row.anonymous,
+  };
 }
 
-export function saveUser(user) {
-  const users = getUsers();
-  const record = { id: uid('user'), createdAt: Date.now(), ...user };
-  users.push(record);
-  write(KEYS.users, users);
-  return record;
+function throwIfError(error) {
+  if (error) throw new Error(error.message);
 }
 
-export function updateUser(id, patch) {
-  const users = getUsers().map((u) => (u.id === id ? { ...u, ...patch } : u));
-  write(KEYS.users, users);
-  return getUserById(id);
+// ---------- Autenticación ----------
+
+export async function signUp({ email, password, role, nombre, apellidos, telefono, especialidad, edad, clienteTipo }) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { role, nombre, apellidos, telefono, especialidad, edad, clienteTipo } },
+  });
+  throwIfError(error);
+  return data; // data.session es null si falta confirmar el correo
 }
 
-// ---------- Session ----------
-
-export function getSession() {
-  return read(KEYS.session, null);
+export async function signIn({ email, password }) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  throwIfError(error);
+  return data;
 }
 
-export function setSession(session) {
-  write(KEYS.session, session);
+export async function signOut() {
+  await supabase.auth.signOut();
 }
 
-export function clearSession() {
-  localStorage.removeItem(KEYS.session);
+export async function resetPassword(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+  throwIfError(error);
 }
 
-// ---------- Treatments (catálogo del admin) ----------
-
-export function getTreatments() {
-  return read(KEYS.treatments, []);
+// callback(session | null) — se llama de inmediato con el estado actual y
+// luego cada vez que cambia (login, logout, confirmación de correo, etc).
+export function onAuthChange(callback) {
+  supabase.auth.onAuthStateChange((_event, session) => callback(session));
 }
 
-export function addTreatment(treatment) {
-  const list = getTreatments();
-  const record = { id: uid('tx'), ...treatment };
-  list.push(record);
-  write(KEYS.treatments, list);
-  return record;
+// ---------- Perfiles ----------
+
+export async function getUserById(id) {
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+  if (error) return null;
+  return mapProfile(data);
 }
 
-// ---------- Bookings ----------
-
-export function getBookings() {
-  return read(KEYS.bookings, []);
+export async function getUsersByRole(role) {
+  const { data, error } = await supabase.from('profiles').select('*').eq('role', role);
+  throwIfError(error);
+  return (data || []).map(mapProfile);
 }
 
-export function getBookingsForPatient(patientId) {
-  return getBookings().filter((b) => b.patientId === patientId);
+export async function updateUser(id, patch) {
+  const dbPatch = {};
+  if (patch.nombre !== undefined) dbPatch.nombre = patch.nombre;
+  if (patch.apellidos !== undefined) dbPatch.apellidos = patch.apellidos;
+  if (patch.telefono !== undefined) dbPatch.telefono = patch.telefono;
+  if (patch.edad !== undefined) dbPatch.edad = patch.edad === '' ? null : Number(patch.edad);
+  if (patch.canRequestChanges !== undefined) dbPatch.can_request_changes = patch.canRequestChanges;
+  const { data, error } = await supabase.from('profiles').update(dbPatch).eq('id', id).select().single();
+  throwIfError(error);
+  return mapProfile(data);
 }
 
-export function getBookingsForDoctor(doctorId) {
-  return getBookings().filter((b) => b.doctorId === doctorId);
+// ---------- Tratamientos ----------
+
+export async function getTreatments() {
+  const { data, error } = await supabase.from('treatments').select('*').order('created_at');
+  throwIfError(error);
+  return (data || []).map(mapTreatment);
 }
 
-export function addBooking(booking) {
-  const list = getBookings();
-  const record = { id: uid('bk'), status: 'pendiente', createdAt: Date.now(), ...booking };
-  list.push(record);
-  write(KEYS.bookings, list);
-  return record;
+export async function addTreatment({ nombre, duracionMin, precio }) {
+  const { data, error } = await supabase
+    .from('treatments')
+    .insert({ nombre, duracion_min: Number(duracionMin), precio: Number(precio) })
+    .select()
+    .single();
+  throwIfError(error);
+  return mapTreatment(data);
 }
 
-export function updateBooking(id, patch) {
-  const list = getBookings().map((b) => (b.id === id ? { ...b, ...patch } : b));
-  write(KEYS.bookings, list);
-  return getBookings().find((b) => b.id === id);
+// ---------- Citas ----------
+
+export async function getBookings() {
+  const { data, error } = await supabase.from('bookings').select('*');
+  throwIfError(error);
+  return (data || []).map(mapBooking);
 }
 
-// ---------- Intake (cuestionario de salud del paciente) ----------
-
-export function getIntake(patientId) {
-  const all = read(KEYS.intake, {});
-  return all[patientId] || null;
+export async function getBookingsForPatient(patientId) {
+  const { data, error } = await supabase.from('bookings').select('*').eq('patient_id', patientId);
+  throwIfError(error);
+  return (data || []).map(mapBooking);
 }
 
-export function saveIntake(patientId, data) {
-  const all = read(KEYS.intake, {});
-  all[patientId] = data;
-  write(KEYS.intake, all);
+export async function getBookingsForDoctor(doctorId) {
+  const { data, error } = await supabase.from('bookings').select('*').eq('doctor_id', doctorId);
+  throwIfError(error);
+  return (data || []).map(mapBooking);
 }
 
-// ---------- Ratings ----------
-
-export function getRatingsForDoctor(doctorId) {
-  return read(KEYS.ratings, []).filter((r) => r.doctorId === doctorId);
+export async function addBooking({ patientId, doctorId, treatmentId, date, startTime, endTime }) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert({
+      patient_id: patientId,
+      doctor_id: doctorId,
+      treatment_id: treatmentId,
+      date,
+      start_time: startTime,
+      end_time: endTime,
+      status: 'pendiente',
+    })
+    .select()
+    .single();
+  throwIfError(error);
+  return mapBooking(data);
 }
 
-export function addRating(rating) {
-  const list = read(KEYS.ratings, []);
-  const record = { id: uid('rt'), createdAt: Date.now(), ...rating };
-  list.push(record);
-  write(KEYS.ratings, list);
-  return record;
+export async function updateBooking(id, patch) {
+  const dbPatch = {};
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.doctorId !== undefined) dbPatch.doctor_id = patch.doctorId;
+  if (patch.date !== undefined) dbPatch.date = patch.date;
+  if (patch.startTime !== undefined) dbPatch.start_time = patch.startTime;
+  if (patch.endTime !== undefined) dbPatch.end_time = patch.endTime;
+  if (patch.ratedByPatient !== undefined) dbPatch.rated_by_patient = patch.ratedByPatient;
+  const { data, error } = await supabase.from('bookings').update(dbPatch).eq('id', id).select().single();
+  throwIfError(error);
+  return mapBooking(data);
 }
 
-// ---------- Change requests (doctor pide cancelar/reprogramar) ----------
+// ---------- Cuestionario de salud (intake) ----------
 
-export function getChangeRequests() {
-  return read(KEYS.changeRequests, []);
+export async function getIntake(patientId) {
+  const { data, error } = await supabase.from('intake').select('*').eq('patient_id', patientId).maybeSingle();
+  if (error) return null;
+  return mapIntake(data);
 }
 
-export function addChangeRequest(req) {
-  const list = getChangeRequests();
-  const record = { id: uid('cr'), status: 'pendiente', createdAt: Date.now(), ...req };
-  list.push(record);
-  write(KEYS.changeRequests, list);
-  return record;
+export async function getAllIntakes() {
+  const { data, error } = await supabase.from('intake').select('*');
+  throwIfError(error);
+  const map = {};
+  (data || []).forEach((row) => {
+    map[row.patient_id] = mapIntake(row);
+  });
+  return map;
 }
 
-export function updateChangeRequest(id, patch) {
-  const list = getChangeRequests().map((r) => (r.id === id ? { ...r, ...patch } : r));
-  write(KEYS.changeRequests, list);
-  return getChangeRequests().find((r) => r.id === id);
+export async function saveIntake(patientId, { edad, condiciones, fuma, alergias, medicamentos }) {
+  const { error } = await supabase.from('intake').upsert({
+    patient_id: patientId,
+    edad: edad === '' || edad == null ? null : Number(edad),
+    condiciones,
+    fuma,
+    alergias,
+    medicamentos,
+    updated_at: new Date().toISOString(),
+  });
+  throwIfError(error);
+}
+
+// ---------- Calificaciones ----------
+
+export async function getRatingsForDoctor(doctorId) {
+  const { data, error } = await supabase.from('ratings').select('*').eq('doctor_id', doctorId);
+  throwIfError(error);
+  return (data || []).map(mapRating);
+}
+
+export async function addRating({ doctorId, bookingId, patientId, stars, note, anonymous }) {
+  const { error } = await supabase.from('ratings').insert({
+    doctor_id: doctorId,
+    booking_id: bookingId,
+    patient_id: patientId,
+    stars: Number(stars),
+    note,
+    anonymous: !!anonymous,
+  });
+  throwIfError(error);
+}
+
+// ---------- Solicitudes de cambio ----------
+
+export async function getChangeRequests() {
+  const { data, error } = await supabase.from('change_requests').select('*');
+  throwIfError(error);
+  return (data || []).map(mapChangeRequest);
+}
+
+export async function addChangeRequest({ bookingId, doctorId }) {
+  const { error } = await supabase.from('change_requests').insert({ booking_id: bookingId, doctor_id: doctorId });
+  throwIfError(error);
+}
+
+export async function updateChangeRequest(id, patch) {
+  const { error } = await supabase.from('change_requests').update(patch).eq('id', id);
+  throwIfError(error);
 }
 
 // ---------- Moneda de la clínica ----------
 
-export function getCurrency() {
-  return read(KEYS.currency, 'USD');
+export async function getCurrency() {
+  const { data } = await supabase.from('clinic_settings').select('currency').eq('id', 1).maybeSingle();
+  return data?.currency || 'USD';
 }
 
-export function setCurrency(code) {
-  write(KEYS.currency, code);
+export async function setCurrency(code) {
+  const { error } = await supabase.from('clinic_settings').update({ currency: code }).eq('id', 1);
+  throwIfError(error);
 }
