@@ -9,6 +9,7 @@ const KEYS = {
   intake: 'cpd_intake',
   ratings: 'cpd_ratings',
   changeRequests: 'cpd_change_requests',
+  currency: 'cpd_currency',
 };
 
 function read(key, fallback) {
@@ -157,4 +158,14 @@ export function updateChangeRequest(id, patch) {
   const list = getChangeRequests().map((r) => (r.id === id ? { ...r, ...patch } : r));
   write(KEYS.changeRequests, list);
   return getChangeRequests().find((r) => r.id === id);
+}
+
+// ---------- Moneda de la clínica ----------
+
+export function getCurrency() {
+  return read(KEYS.currency, 'USD');
+}
+
+export function setCurrency(code) {
+  write(KEYS.currency, code);
 }

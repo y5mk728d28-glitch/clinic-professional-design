@@ -7,3 +7,21 @@ export const BUSINESS = {
 };
 
 export const LOCALE_MAP = { es: 'es-ES', en: 'en-US', de: 'de-DE' };
+
+export const DEFAULT_CURRENCY = 'USD';
+
+export const CURRENCIES = {
+  USD: { symbol: '$', label: 'USD ($)' },
+  EUR: { symbol: '€', label: 'EUR (€)' },
+  GBP: { symbol: '£', label: 'GBP (£)' },
+  MXN: { symbol: '$', label: 'MXN ($)' },
+  DOP: { symbol: 'RD$', label: 'DOP (RD$)' },
+  COP: { symbol: '$', label: 'COP ($)' },
+  ARS: { symbol: '$', label: 'ARS ($)' },
+};
+
+// Iconos por paso de instalación (no dependen del idioma).
+export const INSTALL_ICONS = {
+  android: ['📷', '🔗', '⋮', '➕', '✅', '🏠'],
+  ios: ['📷', '🔗', '⬆️', '➕', '✅', '🏠'],
+};

@@ -1,5 +1,5 @@
-import { t, getLang, setLang, LANGS } from './i18n.js';
-import { BUSINESS, LOCALE_MAP } from './config.js';
+import { t, getLang, setLang, LANGS, getInstallSteps } from './i18n.js';
+import { BUSINESS, LOCALE_MAP, CURRENCIES, INSTALL_ICONS } from './config.js';
 import * as db from './db.js';
 import * as cal from './calendar.js';
 
@@ -14,7 +14,14 @@ const S = {
   adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null },
   ratingOpenFor: null,
   changeRequestedIds: new Set(),
+  install: { os: 'android', step: 0 },
 };
+
+function formatMoney(amount) {
+  const code = db.getCurrency();
+  const symbol = (CURRENCIES[code] && CURRENCIES[code].symbol) || '$';
+  return `${symbol}${amount}`;
+}
 
 function goto(route) {
   location.hash = route;
@@ -85,15 +92,39 @@ function viewWelcome() {
     <div class="card">
       <h1>${t('welcome.title')}</h1>
       <p>${t('welcome.subtitle')}</p>
-      <div class="install-video-box">
-        <div>
-          <strong>${t('welcome.install_title')}</strong><br/>
-          <span class="muted" style="color:#d1d5db;">${t('welcome.install_text')}</span>
-        </div>
-      </div>
       <div class="btn-row">
         <button class="btn btn-brand btn-block" data-action="goto" data-route="#/role-select">${t('welcome.btn_create')}</button>
         <button class="btn btn-block" data-action="goto" data-route="#/login">${t('welcome.btn_login')}</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>${t('welcome.install_title')}</h2>
+      <p>${t('welcome.install_text')}</p>
+      ${installGuide()}
+    </div>
+  `;
+}
+
+function installGuide() {
+  const os = S.install.os;
+  const steps = getInstallSteps(os);
+  const step = Math.min(S.install.step, steps.length - 1);
+  const icon = INSTALL_ICONS[os][step];
+
+  return `
+    <div class="install-guide">
+      <div class="btn-row" style="justify-content:center;">
+        <button class="btn btn-sm ${os === 'android' ? 'btn-brand' : ''}" data-action="set-install-os" data-os="android">${t('install.os_android')}</button>
+        <button class="btn btn-sm ${os === 'ios' ? 'btn-brand' : ''}" data-action="set-install-os" data-os="ios">${t('install.os_ios')}</button>
+      </div>
+      <div class="install-step-card">
+        <div class="install-step-icon">${icon}</div>
+        <p class="install-step-text">${steps[step]}</p>
+      </div>
+      <div class="btn-row" style="justify-content:space-between; align-items:center;">
+        <button class="btn btn-sm" data-action="install-prev" ${step === 0 ? 'disabled' : ''}>${t('install.btn_prev')}</button>
+        <span class="muted">${t('install.step_label')} ${step + 1} ${t('install.of')} ${steps.length}</span>
+        <button class="btn btn-sm" data-action="install-next" ${step === steps.length - 1 ? 'disabled' : ''}>${t('install.btn_next')}</button>
       </div>
     </div>
   `;
@@ -356,7 +387,7 @@ function patientBookingTab(user) {
           cal.isSlotFreeForDoctor(bookings, docId, S.booking.selectedDate, S.booking.selectedSlot, Number(tx.duracionMin))
         );
         treatmentBlock += `
-          <p><strong>${t('booking.estimated_duration')}:</strong> ${tx.duracionMin} ${t('booking.minutes')} · <strong>${t('booking.estimated_price')}:</strong> $${tx.precio}</p>
+          <p><strong>${t('booking.estimated_duration')}:</strong> ${tx.duracionMin} ${t('booking.minutes')} · <strong>${t('booking.estimated_price')}:</strong> ${formatMoney(tx.precio)}</p>
           ${fits
             ? `<button class="btn btn-accept btn-block" data-action="confirm-booking">${t('booking.btn_confirm')}</button>`
             : `<p class="notice">${t('booking.no_slot_selected')}</p>`}
@@ -564,8 +595,16 @@ function dashboardAdmin(user) {
 
 function adminTreatmentsTab() {
   const treatments = db.getTreatments();
+  const currentCurrency = db.getCurrency();
   return `
     <h2>${t('treatments.title')}</h2>
+    <label style="max-width:220px;">${t('treatments.currency')}
+      <select data-onchange="set-currency">
+        ${Object.entries(CURRENCIES)
+          .map(([code, c]) => `<option value="${code}" ${currentCurrency === code ? 'selected' : ''}>${c.label}</option>`)
+          .join('')}
+      </select>
+    </label>
     <form data-form="add-treatment" class="field-row" style="align-items:flex-end;">
       <label>${t('treatments.name')}<input type="text" name="nombre" required /></label>
       <label>${t('treatments.duration')}<input type="number" name="duracionMin" min="5" step="5" required /></label>
@@ -577,7 +616,7 @@ function adminTreatmentsTab() {
         ? `<p class="muted">${t('treatments.list_empty')}</p>`
         : `<table>
             <thead><tr><th>${t('treatments.name')}</th><th>${t('treatments.duration')}</th><th>${t('treatments.price')}</th></tr></thead>
-            <tbody>${treatments.map((tx) => `<tr><td>${tx.nombre}</td><td>${tx.duracionMin} ${t('booking.minutes')}</td><td>$${tx.precio}</td></tr>`).join('')}</tbody>
+            <tbody>${treatments.map((tx) => `<tr><td>${tx.nombre}</td><td>${tx.duracionMin} ${t('booking.minutes')}</td><td>${formatMoney(tx.precio)}</td></tr>`).join('')}</tbody>
           </table>`
     }
   `;
@@ -823,6 +862,22 @@ function onClick(e) {
 
   if (action === 'confirm-booking') return handleConfirmBooking();
 
+  if (action === 'set-install-os') {
+    S.install = { os: el.dataset.os, step: 0 };
+    return render();
+  }
+
+  if (action === 'install-prev') {
+    S.install.step = Math.max(0, S.install.step - 1);
+    return render();
+  }
+
+  if (action === 'install-next') {
+    const total = getInstallSteps(S.install.os).length;
+    S.install.step = Math.min(total - 1, S.install.step + 1);
+    return render();
+  }
+
   if (action === 'open-rating') {
     S.ratingOpenFor = el.dataset.booking;
     return render();
@@ -922,6 +977,11 @@ function onChange(e) {
 
   if (action === 'select-treatment') {
     S.booking.treatmentId = el.value;
+    return render();
+  }
+
+  if (action === 'set-currency') {
+    db.setCurrency(el.value);
     return render();
   }
 }

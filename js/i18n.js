@@ -12,9 +12,16 @@ const dict = {
     'welcome.title': 'Bienvenido',
     'welcome.subtitle': 'Agenda tus citas, consulta tu historial y comunícate con tu clínica desde un solo lugar.',
     'welcome.install_title': 'Instala la app en tu teléfono',
-    'welcome.install_text': 'Video explicativo próximamente: cómo agregar esta app a tu pantalla de inicio.',
+    'welcome.install_text': 'Sigue estos pasos para agregarla a tu pantalla de inicio.',
     'welcome.btn_create': 'Crear cuenta',
     'welcome.btn_login': 'Iniciar sesión',
+
+    'install.os_android': 'Android',
+    'install.os_ios': 'iPhone',
+    'install.step_label': 'Paso',
+    'install.of': 'de',
+    'install.btn_prev': 'Atrás',
+    'install.btn_next': 'Siguiente',
 
     'login.title': 'Iniciar sesión',
     'login.username_label': 'Usuario',
@@ -129,6 +136,7 @@ const dict = {
     'treatments.price': 'Precio estimado',
     'treatments.btn_add': 'Agregar tratamiento',
     'treatments.list_empty': 'Aún no hay tratamientos configurados.',
+    'treatments.currency': 'Moneda',
 
     'doctors.title': 'Doctores registrados',
     'doctors.list_empty': 'Aún no hay doctores registrados.',
@@ -158,9 +166,16 @@ const dict = {
     'welcome.title': 'Welcome',
     'welcome.subtitle': 'Book appointments, check your history and talk to your clinic all in one place.',
     'welcome.install_title': 'Install the app on your phone',
-    'welcome.install_text': 'Explainer video coming soon: how to add this app to your home screen.',
+    'welcome.install_text': 'Follow these steps to add it to your home screen.',
     'welcome.btn_create': 'Create account',
     'welcome.btn_login': 'Log in',
+
+    'install.os_android': 'Android',
+    'install.os_ios': 'iPhone',
+    'install.step_label': 'Step',
+    'install.of': 'of',
+    'install.btn_prev': 'Back',
+    'install.btn_next': 'Next',
 
     'login.title': 'Log in',
     'login.username_label': 'Username',
@@ -275,6 +290,7 @@ const dict = {
     'treatments.price': 'Estimated price',
     'treatments.btn_add': 'Add treatment',
     'treatments.list_empty': 'No treatments configured yet.',
+    'treatments.currency': 'Currency',
 
     'doctors.title': 'Registered doctors',
     'doctors.list_empty': 'No doctors registered yet.',
@@ -304,9 +320,16 @@ const dict = {
     'welcome.title': 'Willkommen',
     'welcome.subtitle': 'Termine buchen, Verlauf einsehen und mit Ihrer Praxis kommunizieren — alles an einem Ort.',
     'welcome.install_title': 'App auf Ihrem Handy installieren',
-    'welcome.install_text': 'Erklärvideo folgt in Kürze: So fügen Sie diese App Ihrem Startbildschirm hinzu.',
+    'welcome.install_text': 'Folgen Sie diesen Schritten, um sie zu Ihrem Startbildschirm hinzuzufügen.',
     'welcome.btn_create': 'Konto erstellen',
     'welcome.btn_login': 'Anmelden',
+
+    'install.os_android': 'Android',
+    'install.os_ios': 'iPhone',
+    'install.step_label': 'Schritt',
+    'install.of': 'von',
+    'install.btn_prev': 'Zurück',
+    'install.btn_next': 'Weiter',
 
     'login.title': 'Anmelden',
     'login.username_label': 'Benutzername',
@@ -421,6 +444,7 @@ const dict = {
     'treatments.price': 'Geschätzter Preis',
     'treatments.btn_add': 'Behandlung hinzufügen',
     'treatments.list_empty': 'Noch keine Behandlungen konfiguriert.',
+    'treatments.currency': 'Währung',
 
     'doctors.title': 'Registrierte Ärzte',
     'doctors.list_empty': 'Noch keine Ärzte registriert.',
@@ -443,6 +467,70 @@ const dict = {
     'common.cancel': 'Abbrechen',
   },
 };
+
+// Guía de instalación paso a paso (PWA) por sistema operativo e idioma.
+// Sirve de guion para un video real más adelante; por ahora se muestra
+// como tarjetas interactivas en la pantalla de bienvenida.
+const installSteps = {
+  es: {
+    android: [
+      'Escanea el código QR con la cámara de tu teléfono.',
+      'Toca el enlace para abrir la app en el navegador.',
+      'Toca los tres puntos (⋮) arriba a la derecha.',
+      'Selecciona "Agregar a pantalla de inicio" o "Instalar app".',
+      'Confirma tocando "Agregar" o "Instalar".',
+      'Abre la app desde el ícono en tu pantalla de inicio.',
+    ],
+    ios: [
+      'Escanea el código QR con la cámara de tu iPhone.',
+      'Toca el enlace para abrir la app en Safari.',
+      'Toca el ícono de compartir (el cuadro con la flecha hacia arriba).',
+      'Desliza hacia abajo y selecciona "Agregar a pantalla de inicio".',
+      'Toca "Agregar" arriba a la derecha.',
+      'Abre la app desde el ícono en tu pantalla de inicio.',
+    ],
+  },
+  en: {
+    android: [
+      "Scan the QR code with your phone's camera.",
+      'Tap the link to open the app in your browser.',
+      'Tap the three dots (⋮) in the top right corner.',
+      'Select "Add to Home screen" or "Install app".',
+      'Confirm by tapping "Add" or "Install".',
+      'Open the app from the icon on your home screen.',
+    ],
+    ios: [
+      "Scan the QR code with your iPhone's camera.",
+      'Tap the link to open the app in Safari.',
+      'Tap the Share icon (square with an arrow pointing up).',
+      'Scroll down and select "Add to Home Screen".',
+      'Tap "Add" in the top right corner.',
+      'Open the app from the icon on your home screen.',
+    ],
+  },
+  de: {
+    android: [
+      'Scannen Sie den QR-Code mit der Kamera Ihres Telefons.',
+      'Tippen Sie auf den Link, um die App im Browser zu öffnen.',
+      'Tippen Sie oben rechts auf die drei Punkte (⋮).',
+      'Wählen Sie "Zum Startbildschirm hinzufügen" oder "App installieren".',
+      'Bestätigen Sie mit "Hinzufügen" oder "Installieren".',
+      'Öffnen Sie die App über das Symbol auf Ihrem Startbildschirm.',
+    ],
+    ios: [
+      'Scannen Sie den QR-Code mit der Kamera Ihres iPhones.',
+      'Tippen Sie auf den Link, um die App in Safari zu öffnen.',
+      'Tippen Sie unten auf das Teilen-Symbol (Quadrat mit Pfeil nach oben).',
+      'Scrollen Sie nach unten und wählen Sie "Zum Home-Bildschirm".',
+      'Tippen Sie oben rechts auf "Hinzufügen".',
+      'Öffnen Sie die App über das Symbol auf Ihrem Startbildschirm.',
+    ],
+  },
+};
+
+export function getInstallSteps(os) {
+  return (installSteps[currentLang] && installSteps[currentLang][os]) || installSteps[DEFAULT_LANG][os];
+}
 
 let currentLang = localStorage.getItem('cpd_lang') || DEFAULT_LANG;
 
