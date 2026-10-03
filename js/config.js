@@ -2,7 +2,7 @@
 // (ej. veterinaria) solo se edita este archivo — el resto del código no cambia.
 
 export const BUSINESS = {
-  name: 'Clínica Dental Sonrisa',
+  name: 'Centro Estético Dental García Mari',
   patientLabel: { es: 'Paciente', en: 'Patient', de: 'Patient' },
 };
 

@@ -19,6 +19,7 @@ function mapProfile(row) {
     clienteTipo: row.cliente_tipo,
     canRequestChanges: row.can_request_changes,
     isActive: row.is_active,
+    requestedRole: row.requested_role,
     createdAt: row.created_at,
   };
 }
@@ -78,11 +79,11 @@ function throwIfError(error) {
 
 // ---------- Autenticación ----------
 
-export async function signUp({ email, password, role, nombre, apellidos, telefono, especialidad, edad, clienteTipo }) {
+export async function signUp({ email, password, role, nombre, apellidos, telefono, especialidad, edad, clienteTipo, requestedRole }) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role, nombre, apellidos, telefono, especialidad, edad, clienteTipo } },
+    options: { data: { role, nombre, apellidos, telefono, especialidad, edad, clienteTipo, requestedRole } },
   });
   throwIfError(error);
   return data; // data.session es null si falta confirmar el correo
@@ -133,6 +134,7 @@ export async function updateUser(id, patch) {
   if (patch.role !== undefined) dbPatch.role = patch.role;
   if (patch.especialidad !== undefined) dbPatch.especialidad = patch.especialidad || null;
   if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
+  if (patch.requestedRole !== undefined) dbPatch.requested_role = patch.requestedRole;
   const { data, error } = await supabase.from('profiles').update(dbPatch).eq('id', id).select().single();
   throwIfError(error);
   return mapProfile(data);

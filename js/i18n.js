@@ -45,6 +45,7 @@ const dict = {
     'register.email': 'Correo electrónico',
     'register.password': 'Contraseña',
     'register.specialty': 'Especialidad',
+    'register.specialty_hint': 'llénalo solo si te registras como Doctor — tu acceso quedará pendiente de aprobación del administrador',
     'register.age': 'Edad',
     'register.client_type': 'Tipo de paciente',
     'register.client_new': 'Nuevo',
@@ -144,6 +145,7 @@ const dict = {
     'doctors.view_agenda': 'Ver agenda',
     'doctors.allow_changes': 'Permite cancelar/reprogramar',
 
+    'requests.doctor_requests_title': 'Solicitudes de acceso como Doctor',
     'requests.title': 'Solicitudes de citas',
     'requests.empty': 'No hay solicitudes pendientes.',
     'requests.btn_approve': 'Aprobar',
@@ -211,6 +213,7 @@ const dict = {
     'register.email': 'Email',
     'register.password': 'Password',
     'register.specialty': 'Specialty',
+    'register.specialty_hint': 'fill this in only if registering as a Doctor — your access will be pending admin approval',
     'register.age': 'Age',
     'register.client_type': 'Patient type',
     'register.client_new': 'New',
@@ -310,6 +313,7 @@ const dict = {
     'doctors.view_agenda': 'View schedule',
     'doctors.allow_changes': 'Allow cancel/reschedule',
 
+    'requests.doctor_requests_title': 'Doctor access requests',
     'requests.title': 'Appointment requests',
     'requests.empty': 'No pending requests.',
     'requests.btn_approve': 'Approve',
@@ -377,6 +381,7 @@ const dict = {
     'register.email': 'E-Mail',
     'register.password': 'Passwort',
     'register.specialty': 'Fachgebiet',
+    'register.specialty_hint': 'nur ausfüllen, wenn Sie sich als Arzt registrieren — Ihr Zugang muss vom Admin genehmigt werden',
     'register.age': 'Alter',
     'register.client_type': 'Patiententyp',
     'register.client_new': 'Neu',
@@ -476,6 +481,7 @@ const dict = {
     'doctors.view_agenda': 'Terminplan ansehen',
     'doctors.allow_changes': 'Stornieren/Verschieben erlauben',
 
+    'requests.doctor_requests_title': 'Anfragen für Arztzugang',
     'requests.title': 'Terminanfragen',
     'requests.empty': 'Keine offenen Anfragen.',
     'requests.btn_approve': 'Genehmigen',

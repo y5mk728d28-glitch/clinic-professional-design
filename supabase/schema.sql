@@ -19,6 +19,7 @@ create table public.profiles (
   cliente_tipo text,
   can_request_changes boolean not null default false,
   is_active boolean not null default true,
+  requested_role text,
   created_at timestamptz not null default now()
 );
 
@@ -46,7 +47,7 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-  insert into public.profiles (id, role, nombre, apellidos, telefono, email, especialidad, edad, cliente_tipo)
+  insert into public.profiles (id, role, nombre, apellidos, telefono, email, especialidad, edad, cliente_tipo, requested_role)
   values (
     new.id,
     'patient',
@@ -56,7 +57,8 @@ begin
     new.email,
     new.raw_user_meta_data->>'especialidad',
     nullif(new.raw_user_meta_data->>'edad', '')::int,
-    new.raw_user_meta_data->>'clienteTipo'
+    new.raw_user_meta_data->>'clienteTipo',
+    new.raw_user_meta_data->>'requestedRole'
   );
   return new;
 end;

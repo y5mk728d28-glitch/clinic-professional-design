@@ -283,6 +283,9 @@ function viewRegister() {
             </select>
           </label>
         </div>
+        <label>${t('register.specialty')} <span class="muted">(${t('register.specialty_hint')})</span>
+          <input type="text" name="especialidad" />
+        </label>
         ${passwordField('password', t('register.password'), 'required minlength="6"')}
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('register.btn_submit')}</button>
@@ -844,8 +847,34 @@ async function adminRequestsTab() {
         .join('')
     : `<tr><td colspan="3" class="muted">${t('requests.empty')}</td></tr>`;
 
+  // Personas que se registraron pidiendo acceso de Doctor (llenaron
+  // "Especialidad" al crear su cuenta) — siguen siendo "patient" hasta que
+  // el admin las aprueba aquí.
+  const doctorRequests = patients.filter((p) => p.requestedRole === 'doctor');
+  const doctorRequestRows = doctorRequests.length
+    ? doctorRequests
+        .map(
+          (p) => `<tr>
+            <td>${p.nombre} ${p.apellidos}</td>
+            <td>${p.especialidad || '—'}</td>
+            <td>${p.email}</td>
+            <td class="btn-row">
+              <button class="btn btn-accept btn-sm" data-action="approve-doctor-request" data-user="${p.id}">${t('requests.btn_approve')}</button>
+              <button class="btn btn-deny btn-sm" data-action="deny-doctor-request" data-user="${p.id}">${t('requests.btn_deny')}</button>
+            </td>
+          </tr>`
+        )
+        .join('')
+    : `<tr><td colspan="4" class="muted">${t('requests.empty')}</td></tr>`;
+
   return `
-    <h2>${t('requests.title')}</h2>
+    <h2>${t('requests.doctor_requests_title')}</h2>
+    <table>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.email')}</th><th></th></tr></thead>
+      <tbody>${doctorRequestRows}</tbody>
+    </table>
+
+    <h2 style="margin-top:20px;">${t('requests.title')}</h2>
     <table>
       <thead><tr><th>Paciente</th><th>Doctor</th><th>${t('treatments.name')}</th><th>${t('booking.title')}</th><th>Status</th><th></th></tr></thead>
       <tbody>${pendingRows}</tbody>
@@ -1136,6 +1165,16 @@ async function onClick(e) {
     await db.updateChangeRequest(el.dataset.request, { status: 'rechazada' });
     return render();
   }
+
+  if (action === 'approve-doctor-request') {
+    await db.updateUser(el.dataset.user, { role: 'doctor', requestedRole: null });
+    return render();
+  }
+
+  if (action === 'deny-doctor-request') {
+    await db.updateUser(el.dataset.user, { requestedRole: null, especialidad: '' });
+    return render();
+  }
 }
 
 async function onChange(e) {
@@ -1217,6 +1256,7 @@ async function onSubmit(e) {
   }
 
   if (type === 'register') {
+    const especialidad = (data.especialidad || '').trim();
     try {
       const result = await db.signUp({
         email: data.email,
@@ -1227,6 +1267,8 @@ async function onSubmit(e) {
         telefono: combinedPhone(data),
         edad: data.edad,
         clienteTipo: data.clienteTipo,
+        especialidad: especialidad || undefined,
+        requestedRole: especialidad ? 'doctor' : undefined,
       });
       if (result.session) return goto('#/dashboard');
       S.notice = t('register.confirm_email_notice');
