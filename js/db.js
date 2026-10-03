@@ -318,3 +318,13 @@ export async function setCurrency(code) {
   const { error } = await supabase.from('clinic_settings').update({ currency: code }).eq('id', 1);
   throwIfError(error);
 }
+
+export async function isHealthIntakeEnabled() {
+  const { data } = await supabase.from('clinic_settings').select('health_intake_enabled').eq('id', 1).maybeSingle();
+  return !!data?.health_intake_enabled;
+}
+
+export async function setHealthIntakeEnabled(enabled) {
+  const { error } = await supabase.from('clinic_settings').update({ health_intake_enabled: enabled }).eq('id', 1);
+  throwIfError(error);
+}

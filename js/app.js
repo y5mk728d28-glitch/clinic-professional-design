@@ -384,10 +384,13 @@ function viewIntake() {
 async function viewDashboard() {
   const user = authUser;
   if (user.role === 'patient') {
-    const intake = await db.getIntake(user.id);
-    if (!intake) {
-      goto('#/intake');
-      return '';
+    const intakeEnabled = await db.isHealthIntakeEnabled();
+    if (intakeEnabled) {
+      const intake = await db.getIntake(user.id);
+      if (!intake) {
+        goto('#/intake');
+        return '';
+      }
     }
     return dashboardPatient(user);
   }
@@ -722,16 +725,29 @@ async function dashboardAdmin(user) {
 }
 
 async function adminTreatmentsTab() {
-  const [treatments, currentCurrency] = await Promise.all([db.getTreatments(), db.getCurrency()]);
+  const [treatments, currentCurrency, intakeEnabled] = await Promise.all([
+    db.getTreatments(),
+    db.getCurrency(),
+    db.isHealthIntakeEnabled(),
+  ]);
   return `
+    <h2>${t('admin.general_settings_title')}</h2>
+    <div class="field-row">
+      <label style="max-width:220px;">${t('treatments.currency')}
+        <select data-onchange="set-currency">
+          ${Object.entries(CURRENCIES)
+            .map(([code, c]) => `<option value="${code}" ${currentCurrency === code ? 'selected' : ''}>${c.label}</option>`)
+            .join('')}
+        </select>
+      </label>
+      <label style="flex-direction:row; align-items:center; gap:8px; max-width:320px;">
+        <input type="checkbox" data-onchange="toggle-health-intake" style="width:auto;" ${intakeEnabled ? 'checked' : ''} />
+        ${t('admin.health_intake_toggle')}
+      </label>
+    </div>
+    <p class="muted">${t('admin.health_intake_hint')}</p>
+
     <h2>${t('treatments.title')}</h2>
-    <label style="max-width:220px;">${t('treatments.currency')}
-      <select data-onchange="set-currency">
-        ${Object.entries(CURRENCIES)
-          .map(([code, c]) => `<option value="${code}" ${currentCurrency === code ? 'selected' : ''}>${c.label}</option>`)
-          .join('')}
-      </select>
-    </label>
     <form data-form="add-treatment" class="field-row" style="align-items:flex-end;">
       <label>${t('treatments.name')}<input type="text" name="nombre" required /></label>
       <label>${t('treatments.duration')}<input type="number" name="duracionMin" min="5" step="5" required /></label>
@@ -1292,6 +1308,11 @@ async function onChange(e) {
 
   if (action === 'set-currency') {
     await db.setCurrency(el.value);
+    return render();
+  }
+
+  if (action === 'toggle-health-intake') {
+    await db.setHealthIntakeEnabled(el.checked);
     return render();
   }
 

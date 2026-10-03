@@ -190,11 +190,12 @@ create policy "doctor reads own change requests" on public.change_requests
 create policy "admin manages change requests" on public.change_requests
   for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
 
--- ---------- Configuración de la clínica (moneda) ----------
+-- ---------- Configuración de la clínica (moneda, cuestionario de salud) ----------
 
 create table public.clinic_settings (
   id int primary key default 1,
   currency text not null default 'USD',
+  health_intake_enabled boolean not null default false,
   check (id = 1)
 );
 

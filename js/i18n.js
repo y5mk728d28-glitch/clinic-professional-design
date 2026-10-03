@@ -137,6 +137,9 @@ const dict = {
     'admin.tab_requests': 'Solicitudes',
     'admin.tab_patients': 'Pacientes',
     'admin.tab_settings': 'Ajustes',
+    'admin.general_settings_title': 'Configuración general',
+    'admin.health_intake_toggle': 'Pedir cuestionario de salud al paciente',
+    'admin.health_intake_hint': 'Si lo activas, cada paciente nuevo deberá llenar edad, enfermedades, si fuma, alergias y medicamentos antes de poder agendar. Esto implica manejar información de salud — considera tus obligaciones legales de protección de datos antes de activarlo.',
 
     'treatments.title': 'Catálogo de tratamientos',
     'treatments.name': 'Tratamiento',
@@ -314,6 +317,9 @@ const dict = {
     'admin.tab_requests': 'Requests',
     'admin.tab_patients': 'Patients',
     'admin.tab_settings': 'Settings',
+    'admin.general_settings_title': 'General settings',
+    'admin.health_intake_toggle': 'Ask patients for a health questionnaire',
+    'admin.health_intake_hint': "If enabled, every new patient must fill in age, conditions, smoking, allergies and medications before they can book. This means handling health data — consider your legal data-protection obligations before turning it on.",
 
     'treatments.title': 'Treatment catalog',
     'treatments.name': 'Treatment',
@@ -491,6 +497,9 @@ const dict = {
     'admin.tab_requests': 'Anfragen',
     'admin.tab_patients': 'Patienten',
     'admin.tab_settings': 'Einstellungen',
+    'admin.general_settings_title': 'Allgemeine Einstellungen',
+    'admin.health_intake_toggle': 'Gesundheitsfragebogen vom Patienten verlangen',
+    'admin.health_intake_hint': 'Wenn aktiviert, muss jeder neue Patient Alter, Erkrankungen, Rauchen, Allergien und Medikamente angeben, bevor er einen Termin buchen kann. Das bedeutet, Gesundheitsdaten zu verarbeiten — prüfen Sie Ihre rechtlichen Datenschutzpflichten, bevor Sie dies aktivieren.',
 
     'treatments.title': 'Behandlungskatalog',
     'treatments.name': 'Behandlung',
