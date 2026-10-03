@@ -190,34 +190,84 @@ function installGuide() {
   `;
 }
 
-// Campo de contraseña con el "ojito" para mostrar/ocultar lo que se escribe.
+// Campo de contraseña con ícono para mostrar/ocultar lo que se escribe
+// (SVG en vez de emoji, para que se vea como un control serio).
+const EYE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-7 0-11-7-11-7a21.8 21.8 0 0 1 5.06-5.94M9.9 4.24A10.9 10.9 0 0 1 12 4c7 0 11 7 11 7a21.8 21.8 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
 function passwordField(name, label, extraAttrs = '') {
   return `
     <label>${label}
       <div class="password-field">
         <input type="password" name="${name}" ${extraAttrs} />
-        <button type="button" class="password-toggle" data-action="toggle-password" title="${t('common.toggle_password')}">👁️</button>
+        <button type="button" class="password-toggle" data-action="toggle-password" title="${t('common.toggle_password')}">${EYE_ICON}</button>
       </div>
     </label>
   `;
 }
 
-// Teléfono con código de país — se guarda como un solo texto ("+34 612345678").
-const COUNTRY_CODES = ['+1', '+34', '+52', '+57', '+54', '+49', '+44', '+33'];
+// Teléfono con código de país — bandera + nombre + código, agrupados por
+// continente. Se guarda como un solo texto ("+34 612345678"); esto es solo
+// la lista del menú, no toca Supabase para nada.
+const COUNTRY_GROUPS = [
+  {
+    continent: 'register.continent_europe',
+    countries: [
+      { flag: '🇪🇸', name: 'España', code: '+34' },
+      { flag: '🇩🇪', name: 'Deutschland', code: '+49' },
+      { flag: '🇫🇷', name: 'France', code: '+33' },
+      { flag: '🇮🇹', name: 'Italia', code: '+39' },
+      { flag: '🇬🇧', name: 'United Kingdom', code: '+44' },
+      { flag: '🇵🇹', name: 'Portugal', code: '+351' },
+      { flag: '🇳🇱', name: 'Nederland', code: '+31' },
+      { flag: '🇧🇪', name: 'België', code: '+32' },
+      { flag: '🇨🇭', name: 'Schweiz', code: '+41' },
+    ],
+  },
+  {
+    continent: 'register.continent_america',
+    countries: [
+      { flag: '🇺🇸', name: 'United States', code: '+1' },
+      { flag: '🇨🇦', name: 'Canada', code: '+1' },
+      { flag: '🇲🇽', name: 'México', code: '+52' },
+      { flag: '🇩🇴', name: 'República Dominicana', code: '+1' },
+      { flag: '🇵🇷', name: 'Puerto Rico', code: '+1' },
+      { flag: '🇬🇹', name: 'Guatemala', code: '+502' },
+      { flag: '🇨🇷', name: 'Costa Rica', code: '+506' },
+      { flag: '🇵🇦', name: 'Panamá', code: '+507' },
+      { flag: '🇨🇴', name: 'Colombia', code: '+57' },
+      { flag: '🇻🇪', name: 'Venezuela', code: '+58' },
+      { flag: '🇪🇨', name: 'Ecuador', code: '+593' },
+      { flag: '🇵🇪', name: 'Perú', code: '+51' },
+      { flag: '🇨🇱', name: 'Chile', code: '+56' },
+      { flag: '🇦🇷', name: 'Argentina', code: '+54' },
+      { flag: '🇧🇷', name: 'Brasil', code: '+55' },
+    ],
+  },
+];
+const ALL_COUNTRIES = COUNTRY_GROUPS.flatMap((g) => g.countries);
 
 function phoneField(label, value = '') {
-  let code = '+1';
   let number = value || '';
-  const match = COUNTRY_CODES.find((c) => number.startsWith(c));
-  if (match) {
-    code = match;
-    number = number.slice(match.length).trim();
-  }
+  // Ordenado de código más largo a más corto para que "+507" no se confunda
+  // con "+5" de otro país al comparar prefijos.
+  const sortedByLength = [...ALL_COUNTRIES].sort((a, b) => b.code.length - a.code.length);
+  const match = sortedByLength.find((c) => number.startsWith(c.code));
+  const selected = match || ALL_COUNTRIES.find((c) => c.name === 'United States');
+  if (match) number = number.slice(match.code.length).trim();
+
   return `
     <label>${label}
       <div class="phone-field">
         <select name="telefono_code">
-          ${COUNTRY_CODES.map((c) => `<option value="${c}" ${c === code ? 'selected' : ''}>${c}</option>`).join('')}
+          ${COUNTRY_GROUPS.map(
+            (group) => `
+            <optgroup label="${t(group.continent)}">
+              ${group.countries
+                .map((c) => `<option value="${c.code}" ${c === selected ? 'selected' : ''}>${c.flag} ${c.name} (${c.code})</option>`)
+                .join('')}
+            </optgroup>`
+          ).join('')}
         </select>
         <input type="tel" name="telefono_number" value="${number}" required />
       </div>
@@ -989,7 +1039,7 @@ async function onClick(e) {
     if (!input) return;
     const hidden = input.type === 'password';
     input.type = hidden ? 'text' : 'password';
-    el.textContent = hidden ? '🙈' : '👁️';
+    el.innerHTML = hidden ? EYE_OFF_ICON : EYE_ICON;
     return; // manipulación directa del DOM: no re-renderizar o se pierde lo escrito
   }
 
