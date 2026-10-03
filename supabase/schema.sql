@@ -20,6 +20,7 @@ create table public.profiles (
   can_request_changes boolean not null default false,
   is_active boolean not null default true,
   requested_role text,
+  extra_doctor boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -70,10 +71,17 @@ create trigger on_auth_user_created
 
 create policy "read own profile" on public.profiles
   for select using (auth.uid() = id);
+-- "doctor" para efectos de reserva no es solo role='doctor' — un admin puede
+-- además marcarse extra_doctor = true (Ajustes → "también soy doctor") para
+-- atender pacientes sin dejar de ser admin.
 create policy "read doctor profiles" on public.profiles
-  for select using (role = 'doctor');
-create policy "staff reads patient profiles" on public.profiles
-  for select using (role = 'patient' and public.current_role() in ('admin','doctor'));
+  for select using (role = 'doctor' or extra_doctor = true);
+-- Un admin o doctor puede reservar una cita para sí mismo como paciente
+-- (patient_id = su propio id, sin importar su rol principal — ver política
+-- de bookings más abajo), así que el personal necesita poder leer
+-- cualquier perfil, no solo los de role='patient'.
+create policy "staff reads any profile" on public.profiles
+  for select using (public.current_role() in ('admin','doctor'));
 create policy "admin full read" on public.profiles
   for select using (public.current_role() = 'admin');
 create policy "update own profile" on public.profiles

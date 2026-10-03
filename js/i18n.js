@@ -38,6 +38,10 @@ const dict = {
     'role.doctor': 'Doctor',
     'role.admin': 'Administrador / Recepcionista',
 
+    'roleselect.title': '¿Cómo quieres usar la app?',
+    'roleselect.subtitle': 'Elige tu rol. El acceso de Doctor queda pendiente de aprobación del administrador, y el de Administrador requiere un código de activación.',
+    'roleselect.btn_back': 'Volver',
+
     'register.title': 'Crear cuenta',
     'register.firstname': 'Nombre',
     'register.lastname': 'Apellidos',
@@ -45,7 +49,10 @@ const dict = {
     'register.email': 'Correo electrónico',
     'register.password': 'Contraseña',
     'register.specialty': 'Especialidad',
-    'register.specialty_hint': 'llénalo solo si te registras como Doctor — tu acceso quedará pendiente de aprobación del administrador',
+    'register.specialty_hint': 'tu acceso quedará pendiente de aprobación del administrador',
+    'register.admin_code': 'Código de activación de administrador',
+    'register.admin_code_hint': 'te lo debe dar el dueño de la clínica',
+    'register.admin_code_invalid_notice': 'El código de activación no es válido o ya se usó. Tu cuenta se creó como Paciente — pídele el código correcto al administrador y actívalo luego desde Ajustes.',
     'register.continent_europe': 'Europa',
     'register.continent_america': 'América',
     'register.age': 'Edad',
@@ -117,6 +124,15 @@ const dict = {
     'settings.admin_code_prompt': 'Escribe el código de activación que te dio el dueño de la plataforma:',
     'settings.admin_code_success': '¡Listo! Tu cuenta ahora es de Administrador.',
     'settings.admin_code_invalid': 'Código inválido o ya utilizado.',
+    'settings.also_doctor_toggle': 'También soy doctor en esta clínica',
+
+    'pendingdoctor.title': 'Solicitud enviada',
+    'pendingdoctor.text': 'Tu cuenta quedó pendiente de aprobación como Doctor. El administrador de la clínica la revisará pronto; mientras tanto no tienes acceso a ningún panel.',
+
+    'viewas.admin': 'Panel de Administrador',
+    'viewas.doctor': 'Panel de Doctor',
+    'viewas.patient': 'Panel de Paciente',
+    'viewas.patient_self': 'Reservar como paciente',
 
     'doctor.tab_agenda': 'Mi agenda',
     'doctor.tab_patients': 'Mis pacientes',
@@ -218,6 +234,10 @@ const dict = {
     'role.doctor': 'Doctor',
     'role.admin': 'Admin / Front desk',
 
+    'roleselect.title': 'How do you want to use the app?',
+    'roleselect.subtitle': 'Choose your role. Doctor access is pending admin approval, and Admin access requires an activation code.',
+    'roleselect.btn_back': 'Back',
+
     'register.title': 'Create account',
     'register.firstname': 'First name',
     'register.lastname': 'Last name',
@@ -225,7 +245,10 @@ const dict = {
     'register.email': 'Email',
     'register.password': 'Password',
     'register.specialty': 'Specialty',
-    'register.specialty_hint': 'fill this in only if registering as a Doctor — your access will be pending admin approval',
+    'register.specialty_hint': 'your access will be pending admin approval',
+    'register.admin_code': 'Admin activation code',
+    'register.admin_code_hint': "the clinic owner should give you this",
+    'register.admin_code_invalid_notice': "The activation code is invalid or already used. Your account was created as a Patient — ask the admin for the right code and claim it later from Settings.",
     'register.continent_europe': 'Europe',
     'register.continent_america': 'America',
     'register.age': 'Age',
@@ -297,6 +320,15 @@ const dict = {
     'settings.admin_code_prompt': 'Enter the activation code the platform owner gave you:',
     'settings.admin_code_success': "Done! Your account is now an Administrator.",
     'settings.admin_code_invalid': 'Invalid or already-used code.',
+    'settings.also_doctor_toggle': 'I am also a doctor at this clinic',
+
+    'pendingdoctor.title': 'Request sent',
+    'pendingdoctor.text': "Your account is pending approval as a Doctor. The clinic's admin will review it soon; until then you don't have access to any dashboard.",
+
+    'viewas.admin': 'Admin Dashboard',
+    'viewas.doctor': 'Doctor Dashboard',
+    'viewas.patient': 'Patient Dashboard',
+    'viewas.patient_self': 'Book as a patient',
 
     'doctor.tab_agenda': 'My schedule',
     'doctor.tab_patients': 'My patients',
@@ -398,6 +430,10 @@ const dict = {
     'role.doctor': 'Arzt',
     'role.admin': 'Admin / Rezeption',
 
+    'roleselect.title': 'Wie möchten Sie die App nutzen?',
+    'roleselect.subtitle': 'Wählen Sie Ihre Rolle. Der Arztzugang muss vom Admin genehmigt werden, und der Adminzugang erfordert einen Aktivierungscode.',
+    'roleselect.btn_back': 'Zurück',
+
     'register.title': 'Konto erstellen',
     'register.firstname': 'Vorname',
     'register.lastname': 'Nachname',
@@ -405,7 +441,10 @@ const dict = {
     'register.email': 'E-Mail',
     'register.password': 'Passwort',
     'register.specialty': 'Fachgebiet',
-    'register.specialty_hint': 'nur ausfüllen, wenn Sie sich als Arzt registrieren — Ihr Zugang muss vom Admin genehmigt werden',
+    'register.specialty_hint': 'Ihr Zugang muss vom Admin genehmigt werden',
+    'register.admin_code': 'Admin-Aktivierungscode',
+    'register.admin_code_hint': 'den sollte Ihnen der Praxisinhaber geben',
+    'register.admin_code_invalid_notice': 'Der Aktivierungscode ist ungültig oder bereits verwendet. Ihr Konto wurde als Patient erstellt — bitten Sie den Admin um den richtigen Code und lösen Sie ihn später in den Einstellungen ein.',
     'register.continent_europe': 'Europa',
     'register.continent_america': 'Amerika',
     'register.age': 'Alter',
@@ -477,6 +516,15 @@ const dict = {
     'settings.admin_code_prompt': 'Geben Sie den Aktivierungscode ein, den Ihnen der Plattforminhaber gegeben hat:',
     'settings.admin_code_success': 'Fertig! Ihr Konto ist jetzt ein Administrator.',
     'settings.admin_code_invalid': 'Ungültiger oder bereits verwendeter Code.',
+    'settings.also_doctor_toggle': 'Ich bin in dieser Praxis auch Arzt',
+
+    'pendingdoctor.title': 'Anfrage gesendet',
+    'pendingdoctor.text': 'Ihr Konto wartet auf Genehmigung als Arzt. Der Admin der Praxis wird es bald prüfen; bis dahin haben Sie keinen Zugriff auf ein Panel.',
+
+    'viewas.admin': 'Admin-Panel',
+    'viewas.doctor': 'Arzt-Panel',
+    'viewas.patient': 'Patienten-Panel',
+    'viewas.patient_self': 'Als Patient buchen',
 
     'doctor.tab_agenda': 'Mein Terminplan',
     'doctor.tab_patients': 'Meine Patienten',

@@ -50,41 +50,61 @@ recuperación.
 
 ## Modelo de seguridad y roles (leer antes de compartir el link)
 
-El registro público **siempre crea la cuenta como Paciente**, sin excepción
-— esto es una decisión deliberada a nivel de base de datos
+La pantalla "Crear cuenta" muestra los 3 roles (Paciente, Doctor,
+Administrador) para que la persona diga qué quiere ser — pero esa elección
+es solo una **señal**, nunca un permiso. A nivel de base de datos, el
+registro público **siempre crea la cuenta como Paciente**, sin excepción
 (`handle_new_user()` en `supabase/schema.sql` ignora cualquier rol que mande
 el cliente). Si no fuera así, cualquiera con el link podría autoasignarse
 "Administrador" con una simple llamada a `supabase.auth.signUp()` desde la
 consola del navegador — el código del frontend siempre es visible, así que
 la única capa confiable es la base de datos, no el formulario.
 
-**Cómo se vuelve alguien Doctor o Administrador:**
+**Qué pasa según el rol elegido al registrarse:**
 
-- **Doctor**: la persona se registra como cualquier paciente (con su correo y
-  contraseña reales), opcionalmente llenando "Especialidad" si quiere acceso
-  de Doctor. Si lo llena, su solicitud aparece en Panel de Admin →
-  Solicitudes → "Solicitudes de acceso como Doctor", donde el admin la
-  aprueba o deniega. También se puede ascender manualmente a cualquier
-  paciente después, desde Pacientes → Editar → campo "Rol". Sin esa
-  aprobación, la persona solo ve el panel de paciente — su cuenta existe
-  pero no tiene agenda ni recibe pacientes hasta que el admin la activa.
-- **Administrador**: protegido con un **código de activación** único por
-  clínica, para que nadie pueda autoasignarse admin sin el permiso del dueño
-  real del negocio (ver `supabase/schema.sql`, tabla `admin_activation` y
-  función `claim_admin()` — el código vive en una tabla que nadie puede leer
-  directo desde el navegador, y se usa una sola vez). Flujo:
-  1. Al configurar el Supabase de una clínica, cambia el valor por defecto
-     `'CAMBIA-ESTE-CODIGO'` por un código único y privado.
-  2. Dáselo en privado SOLO al dueño real de esa clínica.
-  3. Esa persona se registra como paciente, va a Ajustes → "¿Tienes un
-     código de activación de administrador?", lo escribe, y su cuenta se
-     asciende a Administrador automáticamente.
+- **Paciente**: entra directo a su panel, como es de esperar.
+- **Doctor**: debe llenar "Especialidad". Su cuenta queda pendiente — no ve
+  ningún panel, solo una pantalla de "solicitud enviada" — hasta que el
+  admin la aprueba desde Panel de Admin → Solicitudes → "Solicitudes de
+  acceso como Doctor". También se puede ascender manualmente a cualquier
+  paciente después, desde Pacientes → Editar → campo "Rol".
+- **Administrador**: debe escribir el **código de activación** de esa
+  clínica en el mismo formulario. Si el código es correcto, la cuenta sube a
+  Administrador al instante; si es incorrecto o ya se usó, la cuenta
+  simplemente se crea como Paciente normal (solo un mensaje de "código
+  inválido") — nunca falla la creación de la cuenta por un código malo,
+  solo falla la promoción a admin.
 
-  Alternativa manual (si prefieres hacerlo tú mismo por SQL en vez de usar
-  el código):
-  ```sql
-  update public.profiles set role = 'admin' where email = 'correo-del-dueño@ejemplo.com';
-  ```
+**Código de activación de administrador** (ver `supabase/schema.sql`, tabla
+`admin_activation` y función `claim_admin()` — el código vive en una tabla
+que nadie puede leer directo desde el navegador, y se usa una sola vez):
+1. Al configurar el Supabase de una clínica, cambia el valor por defecto
+   `'CAMBIA-ESTE-CODIGO'` por un código único y privado.
+2. Dáselo en privado SOLO al dueño real de esa clínica.
+3. Esa persona lo escribe al registrarse eligiendo "Administrador", o más
+   tarde desde Ajustes → "¿Tienes un código de activación de
+   administrador?" si ya tenía cuenta de paciente.
+
+   Alternativa manual (si prefieres hacerlo tú mismo por SQL en vez de usar
+   el código):
+   ```sql
+   update public.profiles set role = 'admin' where email = 'correo-del-dueño@ejemplo.com';
+   ```
+
+**Una misma persona con más de un rol** (ej. el dueño de la clínica que
+también atiende como Doctor, o un Admin/Doctor que quiere reservar una cita
+para sí mismo como paciente): no hace falta una segunda cuenta ni un segundo
+correo.
+- *Admin que también es Doctor*: desde Ajustes, el admin marca "También soy
+  doctor en esta clínica" y llena su Especialidad. A partir de ahí ve un
+  selector arriba del panel para cambiar entre "Panel de Administrador" y
+  "Panel de Doctor", y los pacientes pueden reservar con él como con
+  cualquier otro doctor.
+- *Cualquier Admin o Doctor reservando para sí mismo*: el selector de panel
+  siempre incluye "Reservar como paciente" — no requiere ninguna
+  configuración previa, porque reservar una cita a nombre propio nunca
+  dependió del rol, solo de que el id del paciente sea el id de quien la
+  crea.
 
 **Notas internas**: en Panel de Admin → Pacientes (botón "Editar") y
 Doctores (botón "Notas"), el admin puede dejarse notas privadas sobre cada

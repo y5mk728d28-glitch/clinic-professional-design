@@ -20,6 +20,7 @@ function mapProfile(row) {
     canRequestChanges: row.can_request_changes,
     isActive: row.is_active,
     requestedRole: row.requested_role,
+    extraDoctor: row.extra_doctor,
     createdAt: row.created_at,
   };
 }
@@ -127,7 +128,11 @@ export async function getUserById(id) {
 }
 
 export async function getUsersByRole(role) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('role', role);
+  // Un "doctor" no es solo quien tiene role='doctor' — un admin puede además
+  // tener habilitado extra_doctor (ver claim de "también soy doctor" en
+  // Ajustes), así que para esta lista en particular hay que incluirlo.
+  const query = supabase.from('profiles').select('*');
+  const { data, error } = role === 'doctor' ? await query.or('role.eq.doctor,extra_doctor.eq.true') : await query.eq('role', role);
   throwIfError(error);
   return (data || []).map(mapProfile);
 }
@@ -143,6 +148,7 @@ export async function updateUser(id, patch) {
   if (patch.especialidad !== undefined) dbPatch.especialidad = patch.especialidad || null;
   if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
   if (patch.requestedRole !== undefined) dbPatch.requested_role = patch.requestedRole;
+  if (patch.extraDoctor !== undefined) dbPatch.extra_doctor = patch.extraDoctor;
   const { data, error } = await supabase.from('profiles').update(dbPatch).eq('id', id).select().single();
   throwIfError(error);
   return mapProfile(data);

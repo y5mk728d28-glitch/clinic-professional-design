@@ -10,6 +10,8 @@ import * as cal from './calendar.js';
 const S = {
   activeTab: {},
   notice: null,
+  registerRole: 'patient',
+  viewAsMode: null,
   booking: {
     filterDoctorId: '',
     selectedDate: null,
@@ -96,7 +98,7 @@ async function render() {
 
   // Con sesión activa, las pantallas de bienvenida/login/registro siempre
   // mandan al dashboard — nunca se queda "pegado" en la última pantalla.
-  const loggedOutOnlyRoute = route === '/welcome' || route === '/login' || route === '/register';
+  const loggedOutOnlyRoute = route === '/welcome' || route === '/login' || route === '/role-select' || route === '/register';
   if (authUser && loggedOutOnlyRoute) {
     goto('#/dashboard');
     return;
@@ -108,6 +110,7 @@ async function render() {
   let body;
   if (route === '/welcome') body = viewWelcome();
   else if (route === '/login') body = viewLogin();
+  else if (route === '/role-select') body = viewRoleSelect();
   else if (route === '/register') body = viewRegister();
   else if (route === '/intake') body = authUser ? viewIntake() : viewWelcome();
   else if (route === '/dashboard') body = authUser ? await viewDashboard() : viewWelcome();
@@ -145,7 +148,7 @@ function viewWelcome() {
       <h1>${t('welcome.title')}</h1>
       <p>${t('welcome.subtitle')}</p>
       <div class="btn-row">
-        <button class="btn btn-brand btn-block" data-action="goto" data-route="#/register">${t('welcome.btn_create')}</button>
+        <button class="btn btn-brand btn-block" data-action="goto" data-route="#/role-select">${t('welcome.btn_create')}</button>
         <button class="btn btn-block" data-action="goto" data-route="#/login">${t('welcome.btn_login')}</button>
       </div>
     </div>
@@ -293,20 +296,86 @@ function viewLogin() {
           <button type="button" class="btn btn-block" data-action="goto" data-route="#/welcome">${t('login.btn_back')}</button>
         </div>
       </form>
-      <button class="link-btn" data-action="goto" data-route="#/register">${t('login.no_account')}</button>
+      <button class="link-btn" data-action="goto" data-route="#/role-select">${t('login.no_account')}</button>
       <button class="link-btn" data-action="forgot-password">${t('login.forgot_password')}</button>
     </div>
   `;
 }
 
-// El registro público solo crea cuentas de Paciente — es la única forma
-// segura de autoregistro sin backend propio (ver README, "Modelo de
-// seguridad"). Para que alguien tenga acceso de Doctor, un admin lo asciende
-// después desde Panel de Admin → Pacientes, una vez ya tiene su cuenta.
+// La pantalla visible de "elige tu rol" es solo para que la persona diga qué
+// quiere ser — la base de datos NUNCA confía en esto (ver handle_new_user()
+// en supabase/schema.sql). Elegir "Doctor" solo marca una solicitud que el
+// admin debe aprobar; elegir "Administrador" solo activa el campo de código
+// de activación en el formulario, y sin el código correcto la cuenta se
+// queda como Paciente normal.
+function viewRoleSelect() {
+  const roles = [
+    { key: 'patient', label: t('role.patient'), initial: 'P' },
+    { key: 'doctor', label: t('role.doctor'), initial: 'D' },
+    { key: 'admin', label: t('role.admin'), initial: 'A' },
+  ];
+  return `
+    <div class="card" style="align-items:center; text-align:center;">
+      <h1>${t('roleselect.title')}</h1>
+      <p>${t('roleselect.subtitle')}</p>
+    </div>
+    <div class="role-grid">
+      ${roles
+        .map(
+          (r) => `
+        <div class="role-card" data-action="select-register-role" data-role="${r.key}">
+          <div class="role-card__icon">${r.initial}</div>
+          <strong>${r.label}</strong>
+        </div>`
+        )
+        .join('')}
+    </div>
+    <button class="btn" data-action="goto" data-route="#/welcome">${t('roleselect.btn_back')}</button>
+  `;
+}
+
+// El registro público siempre crea la cuenta como Paciente a nivel de base
+// de datos (handle_new_user() lo fuerza), sin importar qué rol se haya
+// elegido en la pantalla anterior. Lo que cambia según el rol elegido es
+// solo qué le pasa a la cuenta DESPUÉS de crearse:
+// - Paciente: entra directo a su panel.
+// - Doctor: queda pendiente de aprobación del administrador (ver
+//   "Solicitudes de acceso como Doctor" en el panel de Admin).
+// - Administrador: si el código de activación es correcto, sube a admin al
+//   instante; si no, se queda como una cuenta de Paciente normal.
 function viewRegister() {
+  const role = S.registerRole;
+  const roleLabel = role === 'doctor' ? t('role.doctor') : role === 'admin' ? t('role.admin') : t('role.patient');
+
+  let extraFields = '';
+  if (role === 'doctor') {
+    extraFields = `
+      <label>${t('register.specialty')} <span class="muted">(${t('register.specialty_hint')})</span>
+        <input type="text" name="especialidad" required />
+      </label>`;
+  } else if (role === 'admin') {
+    extraFields = `
+      <label>${t('register.admin_code')} <span class="muted">(${t('register.admin_code_hint')})</span>
+        <input type="text" name="adminCode" required />
+      </label>`;
+  } else {
+    extraFields = `
+      <div class="field-row">
+        <label>${t('register.age')}
+          <input type="number" name="edad" min="0" max="120" required />
+        </label>
+        <label>${t('register.client_type')}
+          <select name="clienteTipo">
+            <option value="nuevo">${t('register.client_new')}</option>
+            <option value="antiguo">${t('register.client_returning')}</option>
+          </select>
+        </label>
+      </div>`;
+  }
+
   return `
     <div class="card">
-      <h1>${t('register.title')}</h1>
+      <h1>${t('register.title')} · ${roleLabel}</h1>
       <form data-form="register">
         <div class="field-row">
           <label>${t('register.firstname')}
@@ -322,24 +391,11 @@ function viewRegister() {
             <input type="email" name="email" required />
           </label>
         </div>
-        <div class="field-row">
-          <label>${t('register.age')}
-            <input type="number" name="edad" min="0" max="120" required />
-          </label>
-          <label>${t('register.client_type')}
-            <select name="clienteTipo">
-              <option value="nuevo">${t('register.client_new')}</option>
-              <option value="antiguo">${t('register.client_returning')}</option>
-            </select>
-          </label>
-        </div>
-        <label>${t('register.specialty')} <span class="muted">(${t('register.specialty_hint')})</span>
-          <input type="text" name="especialidad" />
-        </label>
+        ${extraFields}
         ${passwordField('password', t('register.password'), 'required minlength="6"')}
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('register.btn_submit')}</button>
-          <button type="button" class="btn btn-deny btn-block" data-action="goto" data-route="#/welcome">${t('register.btn_cancel')}</button>
+          <button type="button" class="btn btn-deny btn-block" data-action="goto" data-route="#/role-select">${t('register.btn_cancel')}</button>
         </div>
       </form>
       <button class="link-btn" data-action="goto" data-route="#/login">${t('register.have_account')}</button>
@@ -381,9 +437,52 @@ function viewIntake() {
 // ---------------------------------------------------------------
 // Dashboard router por rol
 // ---------------------------------------------------------------
+
+// Se registró pidiendo acceso de Doctor (llenó "Especialidad") pero sigue
+// siendo "patient" en la base de datos hasta que un admin lo apruebe desde
+// Panel de Admin → Solicitudes. Mientras tanto no ve ningún panel real.
+function viewPendingDoctor(user) {
+  return `
+    <div class="card" style="text-align:center;">
+      <h1>${t('pendingdoctor.title')}</h1>
+      <p>${t('pendingdoctor.text')}</p>
+    </div>
+  `;
+}
+
+// Una misma persona puede tener más de un "sombrero": un admin puede además
+// atender como doctor (user.extraDoctor), y tanto un admin como un doctor
+// pueden además reservar citas para sí mismos como si fueran paciente — esto
+// ya es técnicamente posible (las políticas de reserva solo exigen que
+// patient_id sea su propio id, sin importar su rol principal), así que solo
+// hace falta ofrecer el botón para entrar a esa vista.
+function dashboardViewsFor(user) {
+  const views = [];
+  if (user.role === 'admin') views.push({ key: 'admin', label: t('viewas.admin') });
+  if (user.role === 'doctor' || (user.role === 'admin' && user.extraDoctor)) {
+    views.push({ key: 'doctor', label: t('viewas.doctor') });
+  }
+  if (user.role === 'patient') views.push({ key: 'patient', label: t('viewas.patient') });
+  if (user.role !== 'patient') views.push({ key: 'patient-self', label: t('viewas.patient_self') });
+  return views;
+}
+
 async function viewDashboard() {
   const user = authUser;
-  if (user.role === 'patient') {
+  if (user.role === 'patient' && user.requestedRole === 'doctor') return viewPendingDoctor(user);
+
+  const views = dashboardViewsFor(user);
+  if (!views.some((v) => v.key === S.viewAsMode)) S.viewAsMode = views[0].key;
+  const mode = S.viewAsMode;
+
+  let content;
+  if (mode === 'patient-self') {
+    content = await dashboardPatient(user);
+  } else if (mode === 'doctor') {
+    content = await dashboardDoctor(user);
+  } else if (mode === 'admin') {
+    content = await dashboardAdmin(user);
+  } else {
     const intakeEnabled = await db.isHealthIntakeEnabled();
     if (intakeEnabled) {
       const intake = await db.getIntake(user.id);
@@ -392,10 +491,16 @@ async function viewDashboard() {
         return '';
       }
     }
-    return dashboardPatient(user);
+    content = await dashboardPatient(user);
   }
-  if (user.role === 'doctor') return dashboardDoctor(user);
-  return dashboardAdmin(user);
+
+  if (views.length <= 1) return content;
+  return `
+    <div class="btn-row" style="margin-bottom:14px;">
+      ${views.map((v) => `<button class="btn btn-sm ${v.key === mode ? 'btn-brand' : ''}" data-action="set-view-mode" data-mode="${v.key}">${v.label}</button>`).join('')}
+    </div>
+    ${content}
+  `;
 }
 
 function tabsBar(role, tabs) {
@@ -1043,6 +1148,18 @@ function settingsTab(user) {
           ${LANGS.map((l) => `<option value="${l}" ${l === getLang() ? 'selected' : ''}>${l.toUpperCase()}</option>`).join('')}
         </select>
       </label>
+      ${
+        user.role === 'admin'
+          ? `
+      <label style="flex-direction:row; align-items:center; gap:8px;">
+        <input type="checkbox" name="extraDoctor" style="width:auto;" ${user.extraDoctor ? 'checked' : ''} />
+        ${t('settings.also_doctor_toggle')}
+      </label>
+      <label>${t('register.specialty')}
+        <input type="text" name="especialidad" value="${user.especialidad || ''}" />
+      </label>`
+          : ''
+      }
       <button type="submit" class="btn btn-accept btn-block">${t('settings.btn_save')}</button>
     </form>
     ${user.role === 'patient' ? `<button class="link-btn" data-action="claim-admin">${t('settings.admin_code_link')}</button>` : ''}
@@ -1072,6 +1189,16 @@ async function onClick(e) {
   const action = el.dataset.action;
 
   if (action === 'goto') return goto(el.dataset.route);
+
+  if (action === 'select-register-role') {
+    S.registerRole = el.dataset.role;
+    return goto('#/register');
+  }
+
+  if (action === 'set-view-mode') {
+    S.viewAsMode = el.dataset.mode;
+    return render();
+  }
 
   if (action === 'toggle-password') {
     const input = el.closest('.password-field')?.querySelector('input');
@@ -1372,6 +1499,7 @@ async function onSubmit(e) {
   }
 
   if (type === 'register') {
+    const role = S.registerRole;
     const especialidad = (data.especialidad || '').trim();
     try {
       const result = await db.signUp({
@@ -1383,12 +1511,28 @@ async function onSubmit(e) {
         telefono: combinedPhone(data),
         edad: data.edad,
         clienteTipo: data.clienteTipo,
-        especialidad: especialidad || undefined,
-        requestedRole: especialidad ? 'doctor' : undefined,
+        especialidad: role === 'doctor' ? especialidad : undefined,
+        requestedRole: role === 'doctor' ? 'doctor' : undefined,
       });
-      if (result.session) return goto('#/dashboard');
-      S.notice = t('register.confirm_email_notice');
-      return goto('#/login');
+      if (!result.session) {
+        S.notice = t('register.confirm_email_notice');
+        return goto('#/login');
+      }
+      // Ya hay sesión activa (confirmación de correo desactivada). La cuenta
+      // nació como "patient" sin importar el rol elegido — si pidieron
+      // Administrador, intentamos subirla con el código justo aquí.
+      authUser = await db.getUserById(result.session.user.id);
+      if (role === 'admin') {
+        const code = (data.adminCode || '').trim();
+        const ok = code ? await db.claimAdmin(code) : false;
+        if (ok) {
+          authUser = { ...authUser, role: 'admin' };
+          S.notice = t('settings.admin_code_success');
+        } else {
+          S.notice = t('register.admin_code_invalid_notice');
+        }
+      }
+      return goto('#/dashboard');
     } catch (err) {
       S.notice = err.message;
       return render();
@@ -1439,8 +1583,13 @@ async function onSubmit(e) {
     const [nombre, ...rest] = data.nombre.split(' ');
     const apellidos = rest.join(' ');
     const telefono = combinedPhone(data);
-    await db.updateUser(authUser.id, { nombre, apellidos, telefono, edad: data.edad });
-    authUser = { ...authUser, nombre, apellidos, telefono, edad: Number(data.edad) };
+    const patch = { nombre, apellidos, telefono, edad: data.edad };
+    if (authUser.role === 'admin') {
+      patch.extraDoctor = !!data.extraDoctor;
+      patch.especialidad = data.especialidad || '';
+    }
+    await db.updateUser(authUser.id, patch);
+    authUser = { ...authUser, ...patch, edad: Number(data.edad) };
     setLang(data.idioma);
     S.notice = t('settings.saved_msg');
     return render();
