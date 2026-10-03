@@ -18,6 +18,7 @@ create table public.profiles (
   edad int,
   cliente_tipo text,
   can_request_changes boolean not null default false,
+  is_active boolean not null default true,
   created_at timestamptz not null default now()
 );
 

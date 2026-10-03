@@ -57,7 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
   startInstallAutoplay();
 
   db.onAuthChange(async (session) => {
-    authUser = session ? await db.getUserById(session.user.id) : null;
+    const profile = session ? await db.getUserById(session.user.id) : null;
+    if (profile && profile.isActive === false) {
+      await db.signOut();
+      authUser = null;
+      S.notice = t('login.account_deactivated');
+    } else {
+      authUser = profile;
+    }
     authReady = true;
     render();
   });
@@ -89,7 +96,7 @@ async function render() {
 
   // Con sesión activa, las pantallas de bienvenida/login/registro siempre
   // mandan al dashboard — nunca se queda "pegado" en la última pantalla.
-  const loggedOutOnlyRoute = route === '/welcome' || route === '/login' || route === '/role-select' || route.startsWith('/register/');
+  const loggedOutOnlyRoute = route === '/welcome' || route === '/login' || route === '/register';
   if (authUser && loggedOutOnlyRoute) {
     goto('#/dashboard');
     return;
@@ -101,8 +108,7 @@ async function render() {
   let body;
   if (route === '/welcome') body = viewWelcome();
   else if (route === '/login') body = viewLogin();
-  else if (route === '/role-select') body = viewRoleSelect();
-  else if (route.startsWith('/register/')) body = viewRegister(route.split('/')[2]);
+  else if (route === '/register') body = viewRegister();
   else if (route === '/intake') body = authUser ? viewIntake() : viewWelcome();
   else if (route === '/dashboard') body = authUser ? await viewDashboard() : viewWelcome();
   else body = viewWelcome();
@@ -139,7 +145,7 @@ function viewWelcome() {
       <h1>${t('welcome.title')}</h1>
       <p>${t('welcome.subtitle')}</p>
       <div class="btn-row">
-        <button class="btn btn-brand btn-block" data-action="goto" data-route="#/role-select">${t('welcome.btn_create')}</button>
+        <button class="btn btn-brand btn-block" data-action="goto" data-route="#/register">${t('welcome.btn_create')}</button>
         <button class="btn btn-block" data-action="goto" data-route="#/login">${t('welcome.btn_login')}</button>
       </div>
     </div>
@@ -237,70 +243,21 @@ function viewLogin() {
           <button type="button" class="btn btn-block" data-action="goto" data-route="#/welcome">${t('login.btn_back')}</button>
         </div>
       </form>
-      <button class="link-btn" data-action="goto" data-route="#/role-select">${t('login.no_account')}</button>
+      <button class="link-btn" data-action="goto" data-route="#/register">${t('login.no_account')}</button>
       <button class="link-btn" data-action="forgot-password">${t('login.forgot_password')}</button>
     </div>
   `;
 }
 
-function viewRoleSelect() {
-  // El rol de administrador no se autoregistra desde aquí — lo asigna el
-  // dueño de la clínica una sola vez (ver README) y luego se otorga desde
-  // el panel de admin. Ver supabase/schema.sql: el rol real siempre nace
-  // como "patient" sin importar qué formulario se use.
-  const roles = [
-    { key: 'patient', label: t('role.patient'), initial: 'P' },
-    { key: 'doctor', label: t('role.doctor'), initial: 'D' },
-  ];
-  return `
-    <div class="card" style="align-items:center; text-align:center;">
-      <h1>${t('roleselect.title')}</h1>
-      <p>${t('roleselect.subtitle')}</p>
-    </div>
-    <div class="role-grid">
-      ${roles
-        .map(
-          (r) => `
-        <div class="role-card" data-action="goto" data-route="#/register/${r.key}">
-          <div class="role-card__icon">${r.initial}</div>
-          <strong>${r.label}</strong>
-        </div>`
-        )
-        .join('')}
-    </div>
-    <button class="btn" data-action="goto" data-route="#/welcome">${t('roleselect.btn_back')}</button>
-  `;
-}
-
-function viewRegister(role) {
-  if (!['patient', 'doctor', 'admin'].includes(role)) role = 'patient';
-  const roleLabel = role === 'patient' ? t('role.patient') : role === 'doctor' ? t('role.doctor') : t('role.admin');
-
-  let extraFields = '';
-  if (role === 'doctor') {
-    extraFields = `
-      <label>${t('register.specialty')}
-        <input type="text" name="especialidad" required />
-      </label>`;
-  } else if (role === 'patient') {
-    extraFields = `
-      <div class="field-row">
-        <label>${t('register.age')}
-          <input type="number" name="edad" min="0" max="120" required />
-        </label>
-        <label>${t('register.client_type')}
-          <select name="clienteTipo">
-            <option value="nuevo">${t('register.client_new')}</option>
-            <option value="antiguo">${t('register.client_returning')}</option>
-          </select>
-        </label>
-      </div>`;
-  }
-
+// El registro público solo crea cuentas de Paciente — es la única forma
+// segura de autoregistro sin backend propio (ver README, "Modelo de
+// seguridad"). Para que alguien tenga acceso de Doctor, un admin lo asciende
+// después desde Panel de Admin → Pacientes, una vez ya tiene su cuenta.
+function viewRegister() {
   return `
     <div class="card">
-      <h1>${t('register.title')} · ${roleLabel}</h1>
-      <form data-form="register" data-role="${role}">
+      <h1>${t('register.title')}</h1>
+      <form data-form="register">
         <div class="field-row">
           <label>${t('register.firstname')}
             <input type="text" name="nombre" required />
@@ -315,11 +272,21 @@ function viewRegister(role) {
             <input type="email" name="email" required />
           </label>
         </div>
-        ${extraFields}
+        <div class="field-row">
+          <label>${t('register.age')}
+            <input type="number" name="edad" min="0" max="120" required />
+          </label>
+          <label>${t('register.client_type')}
+            <select name="clienteTipo">
+              <option value="nuevo">${t('register.client_new')}</option>
+              <option value="antiguo">${t('register.client_returning')}</option>
+            </select>
+          </label>
+        </div>
         ${passwordField('password', t('register.password'), 'required minlength="6"')}
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('register.btn_submit')}</button>
-          <button type="button" class="btn btn-deny btn-block" data-action="goto" data-route="#/role-select">${t('register.btn_cancel')}</button>
+          <button type="button" class="btn btn-deny btn-block" data-action="goto" data-route="#/welcome">${t('register.btn_cancel')}</button>
         </div>
       </form>
       <button class="link-btn" data-action="goto" data-route="#/login">${t('register.have_account')}</button>
@@ -413,7 +380,8 @@ async function dashboardPatient(user) {
 }
 
 async function patientBookingTab(user) {
-  const [doctors, bookings, currency] = await Promise.all([db.getUsersByRole('doctor'), db.getBookings(), db.getCurrency()]);
+  const [allDoctors, bookings, currency] = await Promise.all([db.getUsersByRole('doctor'), db.getBookings(), db.getCurrency()]);
+  const doctors = allDoctors.filter((d) => d.isActive !== false);
   const filterId = S.booking.filterDoctorId;
   const viewYear = S.booking.viewYear;
   const viewMonth = S.booking.viewMonth;
@@ -747,11 +715,12 @@ async function adminDoctorsTab() {
   return `
     <h2>${t('doctors.title')}</h2>
     <table>
-      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('doctors.allow_changes')}</th><th></th></tr></thead>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('doctors.allow_changes')}</th><th></th><th></th></tr></thead>
       <tbody>
         ${doctors
           .map((d) => {
             const expanded = S.adminUI.expandedDoctorId === d.id;
+            const active = d.isActive !== false;
             let agendaBlock = '';
             if (expanded) {
               const bookings = allBookings
@@ -765,12 +734,14 @@ async function adminDoctorsTab() {
                 : `<p class="muted">${t('agenda.empty')}</p>`;
             }
             return `
-              <tr>
-                <td>${d.nombre} ${d.apellidos}</td><td>${d.especialidad || ''}</td><td>${d.telefono}</td><td>${d.email}</td>
+              <tr ${active ? '' : 'style="opacity:0.55;"'}>
+                <td>${d.nombre} ${d.apellidos} ${active ? '' : `<span class="badge badge-denied">${t('adminusers.badge_deactivated')}</span>`}</td>
+                <td>${d.especialidad || ''}</td><td>${d.telefono}</td><td>${d.email}</td>
                 <td><input type="checkbox" data-onchange="toggle-doctor-permission" data-doctor="${d.id}" style="width:auto;" ${d.canRequestChanges ? 'checked' : ''} /></td>
                 <td><button class="btn btn-sm" data-action="toggle-doctor-agenda" data-doctor="${d.id}">${t('doctors.view_agenda')}</button></td>
+                <td><button class="btn btn-deny btn-sm" data-action="toggle-active-user" data-user="${d.id}" data-active="${active}">${active ? t('adminusers.btn_deactivate') : t('adminusers.btn_reactivate')}</button></td>
               </tr>
-              ${expanded ? `<tr><td colspan="6">${agendaBlock}</td></tr>` : ''}
+              ${expanded ? `<tr><td colspan="7">${agendaBlock}</td></tr>` : ''}
             `;
           })
           .join('')}
@@ -893,20 +864,23 @@ async function adminPatientsTab() {
   return `
     <h2>${t('adminpatients.title')}</h2>
     <table>
-      <thead><tr><th>${t('settings.name')}</th><th>${t('settings.age')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('intake.smoker')}</th><th>${t('intake.conditions')}</th><th></th></tr></thead>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('settings.age')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('intake.smoker')}</th><th>${t('intake.conditions')}</th><th></th><th></th></tr></thead>
       <tbody>
         ${patients
           .map((p) => {
             const intake = intakeMap[p.id];
             const editing = S.adminUI.editingPatientId === p.id;
-            const row = `<tr>
-              <td>${p.nombre} ${p.apellidos}</td><td>${p.edad ?? '—'}</td><td>${p.telefono}</td><td>${p.email}</td>
+            const active = p.isActive !== false;
+            const row = `<tr ${active ? '' : 'style="opacity:0.55;"'}>
+              <td>${p.nombre} ${p.apellidos} ${active ? '' : `<span class="badge badge-denied">${t('adminusers.badge_deactivated')}</span>`}</td>
+              <td>${p.edad ?? '—'}</td><td>${p.telefono}</td><td>${p.email}</td>
               <td>${intake ? (intake.fuma === 'si' ? t('intake.smoker_yes') : t('intake.smoker_no')) : '—'}</td>
               <td>${intake?.condiciones || '—'}</td>
               <td><button class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('adminpatients.btn_edit')}</button></td>
+              <td><button class="btn btn-deny btn-sm" data-action="toggle-active-user" data-user="${p.id}" data-active="${active}">${active ? t('adminusers.btn_deactivate') : t('adminusers.btn_reactivate')}</button></td>
             </tr>`;
             const editRow = editing
-              ? `<tr><td colspan="7">
+              ? `<tr><td colspan="8">
                   <form data-form="edit-patient" data-patient="${p.id}" class="field-row" style="align-items:flex-end;">
                     <label>${t('register.firstname')}<input type="text" name="nombre" value="${p.nombre}" required /></label>
                     <label>${t('register.lastname')}<input type="text" name="apellidos" value="${p.apellidos}" required /></label>
@@ -1101,6 +1075,13 @@ async function onClick(e) {
     return render();
   }
 
+  if (action === 'toggle-active-user') {
+    const isCurrentlyActive = el.dataset.active === 'true';
+    if (isCurrentlyActive && !confirm(t('adminusers.confirm_deactivate'))) return;
+    await db.updateUser(el.dataset.user, { isActive: !isCurrentlyActive });
+    return render();
+  }
+
   if (action === 'toggle-reassign') {
     S.adminUI.reassignOpenFor = S.adminUI.reassignOpenFor === el.dataset.booking ? null : el.dataset.booking;
     S.adminUI.rescheduleOpenFor = null;
@@ -1191,7 +1172,7 @@ async function handleConfirmBooking() {
   const tx = treatments.find((x) => x.id === S.booking.treatmentId);
   if (!tx) return;
 
-  const doctors = await db.getUsersByRole('doctor');
+  const doctors = (await db.getUsersByRole('doctor')).filter((d) => d.isActive !== false);
   const candidateIds = S.booking.filterDoctorId ? [S.booking.filterDoctorId] : doctors.map((d) => d.id);
   const bookings = await db.getBookings();
   const doctorId = candidateIds.find((docId) =>
@@ -1236,26 +1217,19 @@ async function onSubmit(e) {
   }
 
   if (type === 'register') {
-    const role = form.dataset.role;
     try {
       const result = await db.signUp({
         email: data.email,
         password: data.password,
-        role,
+        role: 'patient',
         nombre: data.nombre,
         apellidos: data.apellidos,
         telefono: combinedPhone(data),
-        especialidad: data.especialidad,
         edad: data.edad,
         clienteTipo: data.clienteTipo,
       });
-      if (result.session) {
-        // El rol real siempre nace como "patient" (ver schema.sql); un admin
-        // debe activar el acceso de Doctor/Administrador manualmente.
-        if (role !== 'patient') S.notice = t('register.pending_activation');
-        return goto('#/dashboard');
-      }
-      S.notice = role === 'patient' ? t('register.confirm_email_notice') : t('register.pending_activation');
+      if (result.session) return goto('#/dashboard');
+      S.notice = t('register.confirm_email_notice');
       return goto('#/login');
     } catch (err) {
       S.notice = err.message;

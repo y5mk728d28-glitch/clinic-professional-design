@@ -18,6 +18,7 @@ function mapProfile(row) {
     edad: row.edad,
     clienteTipo: row.cliente_tipo,
     canRequestChanges: row.can_request_changes,
+    isActive: row.is_active,
     createdAt: row.created_at,
   };
 }
@@ -131,6 +132,7 @@ export async function updateUser(id, patch) {
   if (patch.canRequestChanges !== undefined) dbPatch.can_request_changes = patch.canRequestChanges;
   if (patch.role !== undefined) dbPatch.role = patch.role;
   if (patch.especialidad !== undefined) dbPatch.especialidad = patch.especialidad || null;
+  if (patch.isActive !== undefined) dbPatch.is_active = patch.isActive;
   const { data, error } = await supabase.from('profiles').update(dbPatch).eq('id', id).select().single();
   throwIfError(error);
   return mapProfile(data);

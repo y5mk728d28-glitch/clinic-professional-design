@@ -41,28 +41,30 @@ servidor local o la URL publicada.
 
 ### Primer uso
 
-En la pantalla de bienvenida: "Crear cuenta" → elige rol → completa el
-formulario (el correo y la contraseña son las credenciales reales de login).
-Según la configuración del proyecto de Supabase, puede pedir confirmar el
-correo antes de poder iniciar sesión. "¿Olvidaste tu contraseña?" en el login
-envía un correo de recuperación.
+En la pantalla de bienvenida, "Crear cuenta" lleva directo al formulario de
+**Paciente** — es la única cuenta que se autoregistra (el correo y la
+contraseña son las credenciales reales de login). Según la configuración del
+proyecto de Supabase, puede pedir confirmar el correo antes de poder iniciar
+sesión. "¿Olvidaste tu contraseña?" en el login envía un correo de
+recuperación.
 
 ## Modelo de seguridad y roles (leer antes de compartir el link)
 
-El registro público (botón "Crear cuenta") **siempre crea la cuenta como
-Paciente**, sin importar qué formulario se use — esto es una decisión
-deliberada a nivel de base de datos (`handle_new_user()` en
-`supabase/schema.sql` ignora cualquier rol que mande el cliente). Si no fuera
-así, cualquiera con el link podría autoasignarse "Administrador" con una
-simple llamada a `supabase.auth.signUp()` desde la consola del navegador —
-el código del frontend siempre es visible, así que la única capa confiable
-es la base de datos, no el formulario.
+El registro público **siempre crea la cuenta como Paciente**, sin excepción
+— esto es una decisión deliberada a nivel de base de datos
+(`handle_new_user()` en `supabase/schema.sql` ignora cualquier rol que mande
+el cliente). Si no fuera así, cualquiera con el link podría autoasignarse
+"Administrador" con una simple llamada a `supabase.auth.signUp()` desde la
+consola del navegador — el código del frontend siempre es visible, así que
+la única capa confiable es la base de datos, no el formulario.
 
 **Cómo se vuelve alguien Doctor o Administrador:**
 
-- **Doctor**: un administrador ya existente va a Panel de Admin →
-  Pacientes → busca a esa persona (ya registrada como paciente) → "Editar" →
-  cambia el campo "Rol" a Doctor y completa su especialidad.
+- **Doctor**: la persona primero se registra como cualquier paciente (con su
+  correo y contraseña reales). Luego un administrador va a Panel de Admin →
+  Pacientes → la busca → "Editar" → cambia el campo "Rol" a Doctor y completa
+  su especialidad. Es la "aprobación" del admin: sin ese paso, esa persona
+  solo ve el panel de paciente.
 - **Administrador**: no hay botón para esto en la app a propósito — es
   demasiado sensible para dejarlo a un clic. El dueño de la clínica se
   asciende a sí mismo UNA vez, por SQL, directo en Supabase:
@@ -72,6 +74,16 @@ es la base de datos, no el formulario.
   (Dashboard de Supabase → SQL Editor → pega eso con tu correo real → Run).
   Luego, si ese admin quiere dar acceso de admin a alguien más (ej. su
   recepcionista), lo hace con la misma consulta.
+
+**Quitarle el acceso a alguien**: en Panel de Admin → Pacientes o Doctores,
+el botón "Desactivar acceso" bloquea esa cuenta de inmediato (no puede volver
+a iniciar sesión) y es reversible ("Reactivar acceso"). Nota técnica: esto
+no borra la cuenta de login de Supabase — eso requeriría una pieza de
+servidor aparte (clave que nunca debe vivir en el navegador) que no está
+construida todavía. Para el día a día esto es lo que importa (la persona
+pierde acceso por completo); si alguna vez necesitas borrado permanente real
+(por ejemplo, por ley de protección de datos), ese es un paso adicional a
+construir cuando haga falta.
 
 ## Roles
 

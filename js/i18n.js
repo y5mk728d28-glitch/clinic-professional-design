@@ -32,10 +32,8 @@ const dict = {
     'login.forgot_password': '¿Olvidaste tu contraseña?',
     'login.enter_email_prompt': 'Escribe tu correo para recibir el enlace de recuperación:',
     'login.reset_sent': 'Te enviamos un correo para restablecer tu contraseña.',
+    'login.account_deactivated': 'Esta cuenta fue desactivada por el administrador.',
 
-    'roleselect.title': '¿Cómo quieres registrarte?',
-    'roleselect.subtitle': 'Elige tu rol para continuar',
-    'roleselect.btn_back': 'Volver',
     'role.patient': 'Paciente',
     'role.doctor': 'Doctor',
     'role.admin': 'Administrador / Recepcionista',
@@ -55,7 +53,6 @@ const dict = {
     'register.btn_cancel': 'Cancelar',
     'register.have_account': '¿Ya tienes cuenta? Inicia sesión',
     'register.confirm_email_notice': 'Cuenta creada. Revisa tu correo para confirmarla antes de iniciar sesión.',
-    'register.pending_activation': 'Cuenta creada. Un administrador debe activar tu acceso de Doctor/Administrador — mientras tanto puedes entrar, pero verás el panel de paciente.',
 
     'intake.title': 'Antes de comenzar',
     'intake.subtitle': 'Cuéntanos un poco sobre tu salud. Esto ayuda a tu doctor a prepararse.',
@@ -162,6 +159,11 @@ const dict = {
     'adminpatients.role_label': 'Rol',
     'adminpatients.specialty_if_doctor': 'Solo si lo asciendes a Doctor',
 
+    'adminusers.badge_deactivated': 'Desactivado',
+    'adminusers.btn_deactivate': 'Desactivar acceso',
+    'adminusers.btn_reactivate': 'Reactivar acceso',
+    'adminusers.confirm_deactivate': '¿Seguro que quieres desactivar el acceso de esta persona? Podrás reactivarlo cuando quieras.',
+
     'common.back': 'Volver',
     'common.close': 'Cerrar',
     'common.save': 'Guardar',
@@ -196,10 +198,8 @@ const dict = {
     'login.forgot_password': 'Forgot your password?',
     'login.enter_email_prompt': 'Enter your email to receive the reset link:',
     'login.reset_sent': 'We sent you an email to reset your password.',
+    'login.account_deactivated': 'This account was deactivated by the admin.',
 
-    'roleselect.title': 'How would you like to register?',
-    'roleselect.subtitle': 'Choose your role to continue',
-    'roleselect.btn_back': 'Back',
     'role.patient': 'Patient',
     'role.doctor': 'Doctor',
     'role.admin': 'Admin / Front desk',
@@ -219,7 +219,6 @@ const dict = {
     'register.btn_cancel': 'Cancel',
     'register.have_account': 'Already have an account? Log in',
     'register.confirm_email_notice': 'Account created. Check your email to confirm it before logging in.',
-    'register.pending_activation': 'Account created. An admin must activate your Doctor/Admin access — you can log in meanwhile, but you will see the patient panel.',
 
     'intake.title': 'Before we start',
     'intake.subtitle': 'Tell us a bit about your health. This helps your doctor prepare.',
@@ -326,6 +325,11 @@ const dict = {
     'adminpatients.role_label': 'Role',
     'adminpatients.specialty_if_doctor': 'Only if promoting to Doctor',
 
+    'adminusers.badge_deactivated': 'Deactivated',
+    'adminusers.btn_deactivate': 'Deactivate access',
+    'adminusers.btn_reactivate': 'Reactivate access',
+    'adminusers.confirm_deactivate': "Deactivate this person's access? You can reactivate it anytime.",
+
     'common.back': 'Back',
     'common.close': 'Close',
     'common.save': 'Save',
@@ -360,10 +364,8 @@ const dict = {
     'login.forgot_password': 'Passwort vergessen?',
     'login.enter_email_prompt': 'Geben Sie Ihre E-Mail ein, um den Link zum Zurücksetzen zu erhalten:',
     'login.reset_sent': 'Wir haben Ihnen eine E-Mail zum Zurücksetzen des Passworts gesendet.',
+    'login.account_deactivated': 'Dieses Konto wurde vom Admin deaktiviert.',
 
-    'roleselect.title': 'Wie möchten Sie sich registrieren?',
-    'roleselect.subtitle': 'Wählen Sie Ihre Rolle, um fortzufahren',
-    'roleselect.btn_back': 'Zurück',
     'role.patient': 'Patient',
     'role.doctor': 'Arzt',
     'role.admin': 'Admin / Rezeption',
@@ -383,7 +385,6 @@ const dict = {
     'register.btn_cancel': 'Abbrechen',
     'register.have_account': 'Bereits ein Konto? Anmelden',
     'register.confirm_email_notice': 'Konto erstellt. Bestätigen Sie es per E-Mail, bevor Sie sich anmelden.',
-    'register.pending_activation': 'Konto erstellt. Ein Admin muss Ihren Arzt-/Admin-Zugang aktivieren — Sie können sich inzwischen anmelden, sehen aber das Patienten-Panel.',
 
     'intake.title': 'Bevor wir beginnen',
     'intake.subtitle': 'Erzählen Sie uns etwas über Ihre Gesundheit. Das hilft Ihrem Arzt bei der Vorbereitung.',
@@ -489,6 +490,11 @@ const dict = {
     'adminpatients.btn_edit': 'Bearbeiten',
     'adminpatients.role_label': 'Rolle',
     'adminpatients.specialty_if_doctor': 'Nur bei Beförderung zu Arzt',
+
+    'adminusers.badge_deactivated': 'Deaktiviert',
+    'adminusers.btn_deactivate': 'Zugang deaktivieren',
+    'adminusers.btn_reactivate': 'Zugang reaktivieren',
+    'adminusers.confirm_deactivate': 'Zugang dieser Person deaktivieren? Sie können ihn jederzeit wieder aktivieren.',
 
     'common.back': 'Zurück',
     'common.close': 'Schließen',
