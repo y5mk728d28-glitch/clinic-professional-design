@@ -104,6 +104,14 @@ export async function resetPassword(email) {
   throwIfError(error);
 }
 
+// Devuelve true si el código era válido (y ya ascendió a la cuenta actual a
+// admin), false si estaba mal o ya se había usado.
+export async function claimAdmin(code) {
+  const { data, error } = await supabase.rpc('claim_admin', { input_code: code });
+  throwIfError(error);
+  return !!data;
+}
+
 // callback(session | null) — se llama de inmediato con el estado actual y
 // luego cada vez que cambia (login, logout, confirmación de correo, etc).
 export function onAuthChange(callback) {
@@ -225,6 +233,27 @@ export async function getAllIntakes() {
     map[row.patient_id] = mapIntake(row);
   });
   return map;
+}
+
+// ---------- Notas internas del admin (invisibles para doctor/paciente) ----------
+
+export async function getAllAdminNotes() {
+  const { data, error } = await supabase.from('admin_notes').select('*');
+  throwIfError(error);
+  const map = {};
+  (data || []).forEach((row) => {
+    map[row.profile_id] = row.note;
+  });
+  return map;
+}
+
+export async function setAdminNote(profileId, note) {
+  const { error } = await supabase.from('admin_notes').upsert({
+    profile_id: profileId,
+    note,
+    updated_at: new Date().toISOString(),
+  });
+  throwIfError(error);
 }
 
 export async function saveIntake(patientId, { edad, condiciones, fuma, alergias, medicamentos }) {

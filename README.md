@@ -60,28 +60,47 @@ la única capa confiable es la base de datos, no el formulario.
 
 **Cómo se vuelve alguien Doctor o Administrador:**
 
-- **Doctor**: la persona primero se registra como cualquier paciente (con su
-  correo y contraseña reales). Luego un administrador va a Panel de Admin →
-  Pacientes → la busca → "Editar" → cambia el campo "Rol" a Doctor y completa
-  su especialidad. Es la "aprobación" del admin: sin ese paso, esa persona
-  solo ve el panel de paciente.
-- **Administrador**: no hay botón para esto en la app a propósito — es
-  demasiado sensible para dejarlo a un clic. El dueño de la clínica se
-  asciende a sí mismo UNA vez, por SQL, directo en Supabase:
+- **Doctor**: la persona se registra como cualquier paciente (con su correo y
+  contraseña reales), opcionalmente llenando "Especialidad" si quiere acceso
+  de Doctor. Si lo llena, su solicitud aparece en Panel de Admin →
+  Solicitudes → "Solicitudes de acceso como Doctor", donde el admin la
+  aprueba o deniega. También se puede ascender manualmente a cualquier
+  paciente después, desde Pacientes → Editar → campo "Rol". Sin esa
+  aprobación, la persona solo ve el panel de paciente — su cuenta existe
+  pero no tiene agenda ni recibe pacientes hasta que el admin la activa.
+- **Administrador**: protegido con un **código de activación** único por
+  clínica, para que nadie pueda autoasignarse admin sin el permiso del dueño
+  real del negocio (ver `supabase/schema.sql`, tabla `admin_activation` y
+  función `claim_admin()` — el código vive en una tabla que nadie puede leer
+  directo desde el navegador, y se usa una sola vez). Flujo:
+  1. Al configurar el Supabase de una clínica, cambia el valor por defecto
+     `'CAMBIA-ESTE-CODIGO'` por un código único y privado.
+  2. Dáselo en privado SOLO al dueño real de esa clínica.
+  3. Esa persona se registra como paciente, va a Ajustes → "¿Tienes un
+     código de activación de administrador?", lo escribe, y su cuenta se
+     asciende a Administrador automáticamente.
+
+  Alternativa manual (si prefieres hacerlo tú mismo por SQL en vez de usar
+  el código):
   ```sql
-  update public.profiles set role = 'admin' where email = 'tu-correo@ejemplo.com';
+  update public.profiles set role = 'admin' where email = 'correo-del-dueño@ejemplo.com';
   ```
-  (Dashboard de Supabase → SQL Editor → pega eso con tu correo real → Run).
-  Luego, si ese admin quiere dar acceso de admin a alguien más (ej. su
-  recepcionista), lo hace con la misma consulta.
+
+**Notas internas**: en Panel de Admin → Pacientes (botón "Editar") y
+Doctores (botón "Notas"), el admin puede dejarse notas privadas sobre cada
+persona (por qué se pausó un doctor, por qué se canceló algo, etc.). Viven
+en una tabla aparte que ni el doctor ni el paciente pueden leer — ni
+siquiera llamando a la API directamente.
 
 **Quitarle el acceso a alguien**: en Panel de Admin → Pacientes o Doctores,
 el botón "Desactivar acceso" bloquea esa cuenta de inmediato (no puede volver
-a iniciar sesión) y es reversible ("Reactivar acceso"). Nota técnica: esto
-no borra la cuenta de login de Supabase — eso requeriría una pieza de
-servidor aparte (clave que nunca debe vivir en el navegador) que no está
-construida todavía. Para el día a día esto es lo que importa (la persona
-pierde acceso por completo); si alguna vez necesitas borrado permanente real
+a iniciar sesión) y es reversible ("Reactivar acceso") — sirve igual para
+vacaciones del doctor, una revisión en curso, o negarle el acceso sin
+borrar su cuenta. Nota técnica: esto no borra la cuenta de login de
+Supabase — eso requeriría una pieza de servidor aparte (clave que nunca debe
+vivir en el navegador) que no está construida todavía. Para el día a día
+esto es lo que importa (la persona pierde acceso por completo); si alguna
+vez necesitas borrado permanente real
 (por ejemplo, por ley de protección de datos), ese es un paso adicional a
 construir cuando haga falta.
 

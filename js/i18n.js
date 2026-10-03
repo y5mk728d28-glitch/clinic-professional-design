@@ -113,6 +113,10 @@ const dict = {
     'settings.age': 'Edad',
     'settings.btn_save': 'Guardar cambios',
     'settings.saved_msg': 'Cambios guardados.',
+    'settings.admin_code_link': '¿Tienes un código de activación de administrador?',
+    'settings.admin_code_prompt': 'Escribe el código de activación que te dio el dueño de la plataforma:',
+    'settings.admin_code_success': '¡Listo! Tu cuenta ahora es de Administrador.',
+    'settings.admin_code_invalid': 'Código inválido o ya utilizado.',
 
     'doctor.tab_agenda': 'Mi agenda',
     'doctor.tab_patients': 'Mis pacientes',
@@ -167,6 +171,9 @@ const dict = {
     'adminusers.btn_deactivate': 'Desactivar acceso',
     'adminusers.btn_reactivate': 'Reactivar acceso',
     'adminusers.confirm_deactivate': '¿Seguro que quieres desactivar el acceso de esta persona? Podrás reactivarlo cuando quieras.',
+    'adminusers.notes_label': 'Notas internas (solo las ve el administrador)',
+    'adminusers.notes_placeholder': 'Ej. motivo de cancelación, por qué está pausado, observaciones...',
+    'adminusers.btn_notes': 'Notas',
 
     'common.back': 'Volver',
     'common.close': 'Cerrar',
@@ -283,6 +290,10 @@ const dict = {
     'settings.age': 'Age',
     'settings.btn_save': 'Save changes',
     'settings.saved_msg': 'Changes saved.',
+    'settings.admin_code_link': 'Have an admin activation code?',
+    'settings.admin_code_prompt': 'Enter the activation code the platform owner gave you:',
+    'settings.admin_code_success': "Done! Your account is now an Administrator.",
+    'settings.admin_code_invalid': 'Invalid or already-used code.',
 
     'doctor.tab_agenda': 'My schedule',
     'doctor.tab_patients': 'My patients',
@@ -337,6 +348,9 @@ const dict = {
     'adminusers.btn_deactivate': 'Deactivate access',
     'adminusers.btn_reactivate': 'Reactivate access',
     'adminusers.confirm_deactivate': "Deactivate this person's access? You can reactivate it anytime.",
+    'adminusers.notes_label': 'Internal notes (only the admin sees these)',
+    'adminusers.notes_placeholder': 'E.g. reason for cancellation, why they are paused, observations...',
+    'adminusers.btn_notes': 'Notes',
 
     'common.back': 'Back',
     'common.close': 'Close',
@@ -453,6 +467,10 @@ const dict = {
     'settings.age': 'Alter',
     'settings.btn_save': 'Änderungen speichern',
     'settings.saved_msg': 'Änderungen gespeichert.',
+    'settings.admin_code_link': 'Haben Sie einen Admin-Aktivierungscode?',
+    'settings.admin_code_prompt': 'Geben Sie den Aktivierungscode ein, den Ihnen der Plattforminhaber gegeben hat:',
+    'settings.admin_code_success': 'Fertig! Ihr Konto ist jetzt ein Administrator.',
+    'settings.admin_code_invalid': 'Ungültiger oder bereits verwendeter Code.',
 
     'doctor.tab_agenda': 'Mein Terminplan',
     'doctor.tab_patients': 'Meine Patienten',
@@ -507,6 +525,9 @@ const dict = {
     'adminusers.btn_deactivate': 'Zugang deaktivieren',
     'adminusers.btn_reactivate': 'Zugang reaktivieren',
     'adminusers.confirm_deactivate': 'Zugang dieser Person deaktivieren? Sie können ihn jederzeit wieder aktivieren.',
+    'adminusers.notes_label': 'Interne Notizen (nur für den Admin sichtbar)',
+    'adminusers.notes_placeholder': 'Z. B. Grund der Stornierung, warum pausiert, Beobachtungen...',
+    'adminusers.btn_notes': 'Notizen',
 
     'common.back': 'Zurück',
     'common.close': 'Schließen',

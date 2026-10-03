@@ -206,3 +206,58 @@ create policy "authenticated reads settings" on public.clinic_settings
   for select using (auth.role() = 'authenticated');
 create policy "admin updates settings" on public.clinic_settings
   for update using (public.current_role() = 'admin');
+
+-- ---------- Código de activación de administrador ----------
+-- A propósito NO tiene ninguna política de select/update para 'authenticated':
+-- nadie puede leer esta tabla directo desde el navegador. Solo la función
+-- claim_admin() de abajo (que corre con privilegios de servidor) la puede
+-- consultar. Cambia 'CAMBIA-ESTE-CODIGO' por un código único y privado antes
+-- de dárselo al dueño real de la clínica.
+create table public.admin_activation (
+  id int primary key default 1,
+  code text not null,
+  used boolean not null default false,
+  used_by uuid references public.profiles(id),
+  used_at timestamptz,
+  check (id = 1)
+);
+
+insert into public.admin_activation (id, code) values (1, 'CAMBIA-ESTE-CODIGO');
+
+alter table public.admin_activation enable row level security;
+
+create or replace function public.claim_admin(input_code text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored record;
+begin
+  select * into stored from public.admin_activation where id = 1;
+  if stored is null or stored.used or stored.code <> input_code then
+    return false;
+  end if;
+  update public.profiles set role = 'admin' where id = auth.uid();
+  update public.admin_activation set used = true, used_by = auth.uid(), used_at = now() where id = 1;
+  return true;
+end;
+$$;
+
+grant execute on function public.claim_admin(text) to authenticated;
+
+-- ---------- Notas internas del admin sobre un doctor o paciente ----------
+-- Tabla aparte (no una columna en profiles) para que ni el doctor ni el
+-- paciente puedan leer sus propias notas ni con una llamada directa a la
+-- API — solo existe una política de acceso, y es para 'admin'.
+create table public.admin_notes (
+  profile_id uuid primary key references public.profiles(id) on delete cascade,
+  note text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.admin_notes enable row level security;
+
+create policy "admin manages notes" on public.admin_notes
+  for all using (public.current_role() = 'admin') with check (public.current_role() = 'admin');

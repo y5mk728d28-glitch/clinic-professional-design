@@ -18,7 +18,7 @@ const S = {
     viewYear: new Date().getFullYear(),
     viewMonth: new Date().getMonth(),
   },
-  adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null, editingPatientId: null },
+  adminUI: { reassignOpenFor: null, rescheduleOpenFor: null, expandedDoctorId: null, editingPatientId: null, editingDoctorNotesId: null },
   ratingOpenFor: null,
   install: { os: 'android', step: 0 },
 };
@@ -755,11 +755,12 @@ async function adminTreatmentsTab() {
 }
 
 async function adminDoctorsTab() {
-  const [doctors, treatments, patients, allBookings] = await Promise.all([
+  const [doctors, treatments, patients, allBookings, notesMap] = await Promise.all([
     db.getUsersByRole('doctor'),
     db.getTreatments(),
     db.getUsersByRole('patient'),
     db.getBookings(),
+    db.getAllAdminNotes(),
   ]);
   if (doctors.length === 0) return `<p class="muted">${t('doctors.list_empty')}</p>`;
   const slots = cal.generateSlotStarts();
@@ -768,11 +769,12 @@ async function adminDoctorsTab() {
   return `
     <h2>${t('doctors.title')}</h2>
     <table>
-      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('doctors.allow_changes')}</th><th></th><th></th></tr></thead>
+      <thead><tr><th>${t('settings.name')}</th><th>${t('register.specialty')}</th><th>${t('settings.phone')}</th><th>${t('settings.email')}</th><th>${t('doctors.allow_changes')}</th><th></th><th></th><th></th></tr></thead>
       <tbody>
         ${doctors
           .map((d) => {
             const expanded = S.adminUI.expandedDoctorId === d.id;
+            const editingNotes = S.adminUI.editingDoctorNotesId === d.id;
             const active = d.isActive !== false;
             let agendaBlock = '';
             if (expanded) {
@@ -786,15 +788,28 @@ async function adminDoctorsTab() {
                   </table>`
                 : `<p class="muted">${t('agenda.empty')}</p>`;
             }
+            const notesBlock = editingNotes
+              ? `<tr><td colspan="8">
+                  <form data-form="edit-doctor-notes" data-doctor="${d.id}" class="field-row" style="align-items:flex-end;">
+                    <label style="flex-basis:100%;">${t('adminusers.notes_label')}
+                      <textarea name="adminNote" rows="2" placeholder="${t('adminusers.notes_placeholder')}">${notesMap[d.id] || ''}</textarea>
+                    </label>
+                    <button type="submit" class="btn btn-accept btn-sm">${t('common.save')}</button>
+                    <button type="button" class="btn btn-sm" data-action="toggle-doctor-notes" data-doctor="${d.id}">${t('common.cancel')}</button>
+                  </form>
+                </td></tr>`
+              : '';
             return `
               <tr ${active ? '' : 'style="opacity:0.55;"'}>
                 <td>${d.nombre} ${d.apellidos} ${active ? '' : `<span class="badge badge-denied">${t('adminusers.badge_deactivated')}</span>`}</td>
                 <td>${d.especialidad || ''}</td><td>${d.telefono}</td><td>${d.email}</td>
                 <td><input type="checkbox" data-onchange="toggle-doctor-permission" data-doctor="${d.id}" style="width:auto;" ${d.canRequestChanges ? 'checked' : ''} /></td>
                 <td><button class="btn btn-sm" data-action="toggle-doctor-agenda" data-doctor="${d.id}">${t('doctors.view_agenda')}</button></td>
+                <td><button class="btn btn-sm" data-action="toggle-doctor-notes" data-doctor="${d.id}">${t('adminusers.btn_notes')}</button></td>
                 <td><button class="btn btn-deny btn-sm" data-action="toggle-active-user" data-user="${d.id}" data-active="${active}">${active ? t('adminusers.btn_deactivate') : t('adminusers.btn_reactivate')}</button></td>
               </tr>
-              ${expanded ? `<tr><td colspan="7">${agendaBlock}</td></tr>` : ''}
+              ${expanded ? `<tr><td colspan="8">${agendaBlock}</td></tr>` : ''}
+              ${notesBlock}
             `;
           })
           .join('')}
@@ -938,7 +953,11 @@ async function adminRequestsTab() {
 }
 
 async function adminPatientsTab() {
-  const [patients, intakeMap] = await Promise.all([db.getUsersByRole('patient'), db.getAllIntakes()]);
+  const [patients, intakeMap, notesMap] = await Promise.all([
+    db.getUsersByRole('patient'),
+    db.getAllIntakes(),
+    db.getAllAdminNotes(),
+  ]);
   if (patients.length === 0) return `<p class="muted">${t('adminpatients.empty')}</p>`;
   return `
     <h2>${t('adminpatients.title')}</h2>
@@ -972,6 +991,9 @@ async function adminPatientsTab() {
                       </select>
                     </label>
                     <label>${t('register.specialty')}<input type="text" name="especialidad" value="${p.especialidad || ''}" placeholder="${t('adminpatients.specialty_if_doctor')}" /></label>
+                    <label style="flex-basis:100%;">${t('adminusers.notes_label')}
+                      <textarea name="adminNote" rows="2" placeholder="${t('adminusers.notes_placeholder')}">${notesMap[p.id] || ''}</textarea>
+                    </label>
                     <button type="submit" class="btn btn-accept btn-sm">${t('common.save')}</button>
                     <button type="button" class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('common.cancel')}</button>
                   </form>
@@ -1007,6 +1029,7 @@ function settingsTab(user) {
       </label>
       <button type="submit" class="btn btn-accept btn-block">${t('settings.btn_save')}</button>
     </form>
+    ${user.role === 'patient' ? `<button class="link-btn" data-action="claim-admin">${t('settings.admin_code_link')}</button>` : ''}
   `;
 }
 
@@ -1060,6 +1083,23 @@ async function onClick(e) {
     try {
       await db.resetPassword(email);
       S.notice = t('login.reset_sent');
+    } catch (err) {
+      S.notice = err.message;
+    }
+    return render();
+  }
+
+  if (action === 'claim-admin') {
+    const code = prompt(t('settings.admin_code_prompt'));
+    if (!code) return;
+    try {
+      const ok = await db.claimAdmin(code.trim());
+      if (ok) {
+        authUser = { ...authUser, role: 'admin' };
+        S.notice = t('settings.admin_code_success');
+      } else {
+        S.notice = t('settings.admin_code_invalid');
+      }
     } catch (err) {
       S.notice = err.message;
     }
@@ -1131,6 +1171,11 @@ async function onClick(e) {
 
   if (action === 'toggle-doctor-agenda') {
     S.adminUI.expandedDoctorId = S.adminUI.expandedDoctorId === el.dataset.doctor ? null : el.dataset.doctor;
+    return render();
+  }
+
+  if (action === 'toggle-doctor-notes') {
+    S.adminUI.editingDoctorNotesId = S.adminUI.editingDoctorNotesId === el.dataset.doctor ? null : el.dataset.doctor;
     return render();
   }
 
@@ -1356,7 +1401,15 @@ async function onSubmit(e) {
       role: data.role,
       especialidad: data.especialidad,
     });
+    await db.setAdminNote(form.dataset.patient, data.adminNote || '');
     S.adminUI.editingPatientId = null;
+    S.notice = t('settings.saved_msg');
+    return render();
+  }
+
+  if (type === 'edit-doctor-notes') {
+    await db.setAdminNote(form.dataset.doctor, data.adminNote || '');
+    S.adminUI.editingDoctorNotesId = null;
     S.notice = t('settings.saved_msg');
     return render();
   }
