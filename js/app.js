@@ -1501,7 +1501,17 @@ async function onSubmit(e) {
   if (type === 'register') {
     const role = S.registerRole;
     const especialidad = (data.especialidad || '').trim();
+    const adminCode = (data.adminCode || '').trim();
     try {
+      // Si eligieron Administrador, el código se valida ANTES de crear nada
+      // — un código incorrecto no debe dejar ninguna cuenta a medias.
+      if (role === 'admin') {
+        const valid = adminCode ? await db.checkAdminCode(adminCode) : false;
+        if (!valid) {
+          S.notice = t('register.admin_code_invalid_notice');
+          return render();
+        }
+      }
       const result = await db.signUp({
         email: data.email,
         password: data.password,
@@ -1519,17 +1529,14 @@ async function onSubmit(e) {
         return goto('#/login');
       }
       // Ya hay sesión activa (confirmación de correo desactivada). La cuenta
-      // nació como "patient" sin importar el rol elegido — si pidieron
-      // Administrador, intentamos subirla con el código justo aquí.
+      // nació como "patient" sin importar el rol elegido — si el código de
+      // Administrador era válido (ya lo confirmamos arriba), la subimos aquí.
       authUser = await db.getUserById(result.session.user.id);
       if (role === 'admin') {
-        const code = (data.adminCode || '').trim();
-        const ok = code ? await db.claimAdmin(code) : false;
+        const ok = await db.claimAdmin(adminCode);
         if (ok) {
           authUser = { ...authUser, role: 'admin' };
           S.notice = t('settings.admin_code_success');
-        } else {
-          S.notice = t('register.admin_code_invalid_notice');
         }
       }
       return goto('#/dashboard');

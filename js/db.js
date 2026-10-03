@@ -105,8 +105,16 @@ export async function resetPassword(email) {
   throwIfError(error);
 }
 
+// Solo valida el código sin ascender a nadie (se llama antes de crear la
+// cuenta en el registro, para no crear nada si el código está mal).
+export async function checkAdminCode(code) {
+  const { data, error } = await supabase.rpc('check_admin_code', { input_code: code });
+  throwIfError(error);
+  return !!data;
+}
+
 // Devuelve true si el código era válido (y ya ascendió a la cuenta actual a
-// admin), false si estaba mal o ya se había usado.
+// admin), false si estaba mal.
 export async function claimAdmin(code) {
   const { data, error } = await supabase.rpc('claim_admin', { input_code: code });
   throwIfError(error);

@@ -69,21 +69,30 @@ la única capa confiable es la base de datos, no el formulario.
   acceso como Doctor". También se puede ascender manualmente a cualquier
   paciente después, desde Pacientes → Editar → campo "Rol".
 - **Administrador**: debe escribir el **código de activación** de esa
-  clínica en el mismo formulario. Si el código es correcto, la cuenta sube a
-  Administrador al instante; si es incorrecto o ya se usó, la cuenta
-  simplemente se crea como Paciente normal (solo un mensaje de "código
-  inválido") — nunca falla la creación de la cuenta por un código malo,
-  solo falla la promoción a admin.
+  clínica en el mismo formulario. El código se valida *antes* de crear nada:
+  si está mal, no se crea ninguna cuenta y solo se muestra "código inválido"
+  — la persona puede corregirlo y reintentar sin que quede ninguna cuenta a
+  medias. Si es correcto, la cuenta se crea y sube a Administrador al
+  instante.
 
 **Código de activación de administrador** (ver `supabase/schema.sql`, tabla
-`admin_activation` y función `claim_admin()` — el código vive en una tabla
-que nadie puede leer directo desde el navegador, y se usa una sola vez):
+`admin_activation`, y las funciones `check_admin_code()` — solo valida, no
+crea ni asciende a nadie — y `claim_admin()` — la que realmente asciende; el
+código vive en una tabla que nadie puede leer directo desde el navegador):
 1. Al configurar el Supabase de una clínica, cambia el valor por defecto
-   `'CAMBIA-ESTE-CODIGO'` por un código único y privado.
+   `'CAMBIA-ESTE-CODIGO'` por un código único, largo y privado.
 2. Dáselo en privado SOLO al dueño real de esa clínica.
 3. Esa persona lo escribe al registrarse eligiendo "Administrador", o más
    tarde desde Ajustes → "¿Tienes un código de activación de
    administrador?" si ya tenía cuenta de paciente.
+
+   A propósito el código **no es de un solo uso** — el dueño puede usarlo más
+   de una vez (por ejemplo, para su propia cuenta y para la de alguien de
+   confianza, como otro recepcionista) sin que tengas que generar un código
+   nuevo cada vez. La otra cara de esto: cualquiera que consiga el código
+   puede autoascenderse a Administrador en cualquier momento, así que
+   trátalo como una contraseña maestra y cámbialo (actualiza la fila en
+   `admin_activation`) si alguna vez sospechas que se filtró.
 
    Alternativa manual (si prefieres hacerlo tú mismo por SQL en vez de usar
    el código):

@@ -218,10 +218,13 @@ create policy "admin updates settings" on public.clinic_settings
 
 -- ---------- Código de activación de administrador ----------
 -- A propósito NO tiene ninguna política de select/update para 'authenticated':
--- nadie puede leer esta tabla directo desde el navegador. Solo la función
--- claim_admin() de abajo (que corre con privilegios de servidor) la puede
--- consultar. Cambia 'CAMBIA-ESTE-CODIGO' por un código único y privado antes
--- de dárselo al dueño real de la clínica.
+-- nadie puede leer esta tabla directo desde el navegador. Solo las funciones
+-- de abajo (que corren con privilegios de servidor) la pueden consultar.
+-- Cambia 'CAMBIA-ESTE-CODIGO' por un código único, largo y privado antes de
+-- dárselo al dueño real de la clínica — a propósito NO es de un solo uso
+-- (el dueño puede usarlo más de una vez, ej. para sí mismo y para alguien de
+-- confianza), así que cualquiera que lo consiga puede autoascenderse a
+-- Administrador en cualquier momento. Trátalo como una contraseña maestra.
 create table public.admin_activation (
   id int primary key default 1,
   code text not null,
@@ -235,6 +238,24 @@ insert into public.admin_activation (id, code) values (1, 'CAMBIA-ESTE-CODIGO');
 
 alter table public.admin_activation enable row level security;
 
+-- Solo valida el código (sin ascender a nadie) — se llama ANTES de crear la
+-- cuenta en el formulario de registro, para que un código incorrecto no
+-- cree ninguna cuenta. Se permite desde 'anon' porque el registro todavía
+-- no tiene sesión en ese punto.
+create or replace function public.check_admin_code(input_code text)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (select 1 from public.admin_activation where id = 1 and code = input_code);
+$$;
+
+grant execute on function public.check_admin_code(text) to anon, authenticated;
+
+-- Asciende a admin a la cuenta YA autenticada que llama a esta función. No es
+-- de un solo uso a propósito (ver comentario de la tabla arriba).
 create or replace function public.claim_admin(input_code text)
 returns boolean
 language plpgsql
@@ -245,7 +266,7 @@ declare
   stored record;
 begin
   select * into stored from public.admin_activation where id = 1;
-  if stored is null or stored.used or stored.code <> input_code then
+  if stored is null or stored.code <> input_code then
     return false;
   end if;
   update public.profiles set role = 'admin' where id = auth.uid();
