@@ -163,6 +163,7 @@ const dict = {
     'common.close': 'Cerrar',
     'common.save': 'Guardar',
     'common.cancel': 'Cancelar',
+    'common.toggle_password': 'Mostrar u ocultar contraseña',
   },
 
   en: {
@@ -323,6 +324,7 @@ const dict = {
     'common.close': 'Close',
     'common.save': 'Save',
     'common.cancel': 'Cancel',
+    'common.toggle_password': 'Show or hide password',
   },
 
   de: {
@@ -483,6 +485,7 @@ const dict = {
     'common.close': 'Schließen',
     'common.save': 'Speichern',
     'common.cancel': 'Abbrechen',
+    'common.toggle_password': 'Passwort anzeigen oder verbergen',
   },
 };
 

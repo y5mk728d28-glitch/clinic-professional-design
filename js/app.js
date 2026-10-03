@@ -175,6 +175,18 @@ function installGuide() {
   `;
 }
 
+// Campo de contraseña con el "ojito" para mostrar/ocultar lo que se escribe.
+function passwordField(name, label, extraAttrs = '') {
+  return `
+    <label>${label}
+      <div class="password-field">
+        <input type="password" name="${name}" ${extraAttrs} />
+        <button type="button" class="password-toggle" data-action="toggle-password" title="${t('common.toggle_password')}">👁️</button>
+      </div>
+    </label>
+  `;
+}
+
 function viewLogin() {
   return `
     <div class="card">
@@ -183,9 +195,7 @@ function viewLogin() {
         <label>${t('login.email_label')}
           <input type="email" name="email" required />
         </label>
-        <label>${t('login.password_label')}
-          <input type="password" name="password" required />
-        </label>
+        ${passwordField('password', t('login.password_label'), 'required')}
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('login.btn_submit')}</button>
           <button type="button" class="btn btn-block" data-action="goto" data-route="#/welcome">${t('login.btn_back')}</button>
@@ -269,9 +279,7 @@ function viewRegister(role) {
           </label>
         </div>
         ${extraFields}
-        <label>${t('register.password')}
-          <input type="password" name="password" required minlength="6" />
-        </label>
+        ${passwordField('password', t('register.password'), 'required minlength="6"')}
         <div class="btn-row" style="margin-top:8px;">
           <button type="submit" class="btn btn-accept btn-block">${t('register.btn_submit')}</button>
           <button type="button" class="btn btn-deny btn-block" data-action="goto" data-route="#/role-select">${t('register.btn_cancel')}</button>
@@ -928,6 +936,15 @@ async function onClick(e) {
   const action = el.dataset.action;
 
   if (action === 'goto') return goto(el.dataset.route);
+
+  if (action === 'toggle-password') {
+    const input = el.closest('.password-field')?.querySelector('input');
+    if (!input) return;
+    const hidden = input.type === 'password';
+    input.type = hidden ? 'text' : 'password';
+    el.textContent = hidden ? '🙈' : '👁️';
+    return; // manipulación directa del DOM: no re-renderizar o se pierde lo escrito
+  }
 
   if (action === 'set-lang') {
     setLang(el.dataset.lang);
