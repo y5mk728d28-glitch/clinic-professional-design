@@ -180,6 +180,10 @@ input:focus, select:focus, textarea:focus {
   padding: 4px 6px;
 }
 
+.phone-field { display: flex; gap: 8px; }
+.phone-field select { flex: 0 0 82px; }
+.phone-field input { flex: 1; min-width: 0; }
+
 /* ---------- Buttons ---------- */
 
 .btn {

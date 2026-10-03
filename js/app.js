@@ -86,6 +86,15 @@ async function render() {
   }
 
   const route = currentRoute();
+
+  // Con sesión activa, las pantallas de bienvenida/login/registro siempre
+  // mandan al dashboard — nunca se queda "pegado" en la última pantalla.
+  const loggedOutOnlyRoute = route === '/welcome' || route === '/login' || route === '/role-select' || route.startsWith('/register/');
+  if (authUser && loggedOutOnlyRoute) {
+    goto('#/dashboard');
+    return;
+  }
+
   const notice = S.notice;
   S.notice = null;
 
@@ -187,6 +196,33 @@ function passwordField(name, label, extraAttrs = '') {
   `;
 }
 
+// Teléfono con código de país — se guarda como un solo texto ("+34 612345678").
+const COUNTRY_CODES = ['+1', '+34', '+52', '+57', '+54', '+49', '+44', '+33'];
+
+function phoneField(label, value = '') {
+  let code = '+1';
+  let number = value || '';
+  const match = COUNTRY_CODES.find((c) => number.startsWith(c));
+  if (match) {
+    code = match;
+    number = number.slice(match.length).trim();
+  }
+  return `
+    <label>${label}
+      <div class="phone-field">
+        <select name="telefono_code">
+          ${COUNTRY_CODES.map((c) => `<option value="${c}" ${c === code ? 'selected' : ''}>${c}</option>`).join('')}
+        </select>
+        <input type="tel" name="telefono_number" value="${number}" required />
+      </div>
+    </label>
+  `;
+}
+
+function combinedPhone(data) {
+  return `${data.telefono_code} ${data.telefono_number}`.trim();
+}
+
 function viewLogin() {
   return `
     <div class="card">
@@ -208,10 +244,13 @@ function viewLogin() {
 }
 
 function viewRoleSelect() {
+  // El rol de administrador no se autoregistra desde aquí — lo asigna el
+  // dueño de la clínica una sola vez (ver README) y luego se otorga desde
+  // el panel de admin. Ver supabase/schema.sql: el rol real siempre nace
+  // como "patient" sin importar qué formulario se use.
   const roles = [
     { key: 'patient', label: t('role.patient'), initial: 'P' },
     { key: 'doctor', label: t('role.doctor'), initial: 'D' },
-    { key: 'admin', label: t('role.admin'), initial: 'A' },
   ];
   return `
     <div class="card" style="align-items:center; text-align:center;">
@@ -271,9 +310,7 @@ function viewRegister(role) {
           </label>
         </div>
         <div class="field-row">
-          <label>${t('register.phone')}
-            <input type="tel" name="telefono" required />
-          </label>
+          ${phoneField(t('register.phone'))}
           <label>${t('register.email')}
             <input type="email" name="email" required />
           </label>
@@ -874,7 +911,14 @@ async function adminPatientsTab() {
                     <label>${t('register.firstname')}<input type="text" name="nombre" value="${p.nombre}" required /></label>
                     <label>${t('register.lastname')}<input type="text" name="apellidos" value="${p.apellidos}" required /></label>
                     <label>${t('settings.age')}<input type="number" name="edad" value="${p.edad ?? ''}" /></label>
-                    <label>${t('settings.phone')}<input type="tel" name="telefono" value="${p.telefono}" required /></label>
+                    ${phoneField(t('settings.phone'), p.telefono)}
+                    <label>${t('adminpatients.role_label')}
+                      <select name="role">
+                        <option value="patient">${t('role.patient')}</option>
+                        <option value="doctor">${t('role.doctor')}</option>
+                      </select>
+                    </label>
+                    <label>${t('register.specialty')}<input type="text" name="especialidad" value="${p.especialidad || ''}" placeholder="${t('adminpatients.specialty_if_doctor')}" /></label>
                     <button type="submit" class="btn btn-accept btn-sm">${t('common.save')}</button>
                     <button type="button" class="btn btn-sm" data-action="toggle-edit-patient" data-patient="${p.id}">${t('common.cancel')}</button>
                   </form>
@@ -901,7 +945,7 @@ function settingsTab(user) {
       </div>
       <div class="field-row">
         <label>${t('settings.email')}<input type="email" value="${user.email}" disabled /></label>
-        <label>${t('settings.phone')}<input type="tel" name="telefono" value="${user.telefono}" /></label>
+        ${phoneField(t('settings.phone'), user.telefono)}
       </div>
       <label>${t('settings.language')}
         <select name="idioma">
@@ -1200,15 +1244,18 @@ async function onSubmit(e) {
         role,
         nombre: data.nombre,
         apellidos: data.apellidos,
-        telefono: data.telefono,
+        telefono: combinedPhone(data),
         especialidad: data.especialidad,
         edad: data.edad,
         clienteTipo: data.clienteTipo,
       });
       if (result.session) {
-        return goto(role === 'patient' ? '#/intake' : '#/dashboard');
+        // El rol real siempre nace como "patient" (ver schema.sql); un admin
+        // debe activar el acceso de Doctor/Administrador manualmente.
+        if (role !== 'patient') S.notice = t('register.pending_activation');
+        return goto('#/dashboard');
       }
-      S.notice = t('register.confirm_email_notice');
+      S.notice = role === 'patient' ? t('register.confirm_email_notice') : t('register.pending_activation');
       return goto('#/login');
     } catch (err) {
       S.notice = err.message;
@@ -1239,7 +1286,9 @@ async function onSubmit(e) {
       nombre: data.nombre,
       apellidos: data.apellidos,
       edad: data.edad,
-      telefono: data.telefono,
+      telefono: combinedPhone(data),
+      role: data.role,
+      especialidad: data.especialidad,
     });
     S.adminUI.editingPatientId = null;
     S.notice = t('settings.saved_msg');
@@ -1249,8 +1298,9 @@ async function onSubmit(e) {
   if (type === 'settings') {
     const [nombre, ...rest] = data.nombre.split(' ');
     const apellidos = rest.join(' ');
-    await db.updateUser(authUser.id, { nombre, apellidos, telefono: data.telefono, edad: data.edad });
-    authUser = { ...authUser, nombre, apellidos, telefono: data.telefono, edad: Number(data.edad) };
+    const telefono = combinedPhone(data);
+    await db.updateUser(authUser.id, { nombre, apellidos, telefono, edad: data.edad });
+    authUser = { ...authUser, nombre, apellidos, telefono, edad: Number(data.edad) };
     setLang(data.idioma);
     S.notice = t('settings.saved_msg');
     return render();

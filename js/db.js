@@ -129,6 +129,8 @@ export async function updateUser(id, patch) {
   if (patch.telefono !== undefined) dbPatch.telefono = patch.telefono;
   if (patch.edad !== undefined) dbPatch.edad = patch.edad === '' ? null : Number(patch.edad);
   if (patch.canRequestChanges !== undefined) dbPatch.can_request_changes = patch.canRequestChanges;
+  if (patch.role !== undefined) dbPatch.role = patch.role;
+  if (patch.especialidad !== undefined) dbPatch.especialidad = patch.especialidad || null;
   const { data, error } = await supabase.from('profiles').update(dbPatch).eq('id', id).select().single();
   throwIfError(error);
   return mapProfile(data);

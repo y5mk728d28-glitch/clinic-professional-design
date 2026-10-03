@@ -34,6 +34,11 @@ as $$
 $$;
 
 -- Crea el perfil automáticamente cuando alguien se registra (signUp).
+-- El rol SIEMPRE nace como 'patient', sin importar qué mande el cliente en
+-- raw_user_meta_data — si no, cualquiera podría autoasignarse 'admin' con
+-- una llamada directa a supabase.auth.signUp() desde la consola del
+-- navegador. El admin asciende a Doctor/Administrador manualmente desde el
+-- panel (o un admin ya existente lo hace por SQL).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -43,7 +48,7 @@ begin
   insert into public.profiles (id, role, nombre, apellidos, telefono, email, especialidad, edad, cliente_tipo)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data->>'role', 'patient'),
+    'patient',
     coalesce(new.raw_user_meta_data->>'nombre', ''),
     coalesce(new.raw_user_meta_data->>'apellidos', ''),
     new.raw_user_meta_data->>'telefono',

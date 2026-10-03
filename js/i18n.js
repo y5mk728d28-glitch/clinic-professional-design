@@ -55,6 +55,7 @@ const dict = {
     'register.btn_cancel': 'Cancelar',
     'register.have_account': '¿Ya tienes cuenta? Inicia sesión',
     'register.confirm_email_notice': 'Cuenta creada. Revisa tu correo para confirmarla antes de iniciar sesión.',
+    'register.pending_activation': 'Cuenta creada. Un administrador debe activar tu acceso de Doctor/Administrador — mientras tanto puedes entrar, pero verás el panel de paciente.',
 
     'intake.title': 'Antes de comenzar',
     'intake.subtitle': 'Cuéntanos un poco sobre tu salud. Esto ayuda a tu doctor a prepararse.',
@@ -158,6 +159,8 @@ const dict = {
     'adminpatients.title': 'Pacientes registrados',
     'adminpatients.empty': 'Aún no hay pacientes registrados.',
     'adminpatients.btn_edit': 'Editar',
+    'adminpatients.role_label': 'Rol',
+    'adminpatients.specialty_if_doctor': 'Solo si lo asciendes a Doctor',
 
     'common.back': 'Volver',
     'common.close': 'Cerrar',
@@ -216,6 +219,7 @@ const dict = {
     'register.btn_cancel': 'Cancel',
     'register.have_account': 'Already have an account? Log in',
     'register.confirm_email_notice': 'Account created. Check your email to confirm it before logging in.',
+    'register.pending_activation': 'Account created. An admin must activate your Doctor/Admin access — you can log in meanwhile, but you will see the patient panel.',
 
     'intake.title': 'Before we start',
     'intake.subtitle': 'Tell us a bit about your health. This helps your doctor prepare.',
@@ -319,6 +323,8 @@ const dict = {
     'adminpatients.title': 'Registered patients',
     'adminpatients.empty': 'No patients registered yet.',
     'adminpatients.btn_edit': 'Edit',
+    'adminpatients.role_label': 'Role',
+    'adminpatients.specialty_if_doctor': 'Only if promoting to Doctor',
 
     'common.back': 'Back',
     'common.close': 'Close',
@@ -377,6 +383,7 @@ const dict = {
     'register.btn_cancel': 'Abbrechen',
     'register.have_account': 'Bereits ein Konto? Anmelden',
     'register.confirm_email_notice': 'Konto erstellt. Bestätigen Sie es per E-Mail, bevor Sie sich anmelden.',
+    'register.pending_activation': 'Konto erstellt. Ein Admin muss Ihren Arzt-/Admin-Zugang aktivieren — Sie können sich inzwischen anmelden, sehen aber das Patienten-Panel.',
 
     'intake.title': 'Bevor wir beginnen',
     'intake.subtitle': 'Erzählen Sie uns etwas über Ihre Gesundheit. Das hilft Ihrem Arzt bei der Vorbereitung.',
@@ -480,6 +487,8 @@ const dict = {
     'adminpatients.title': 'Registrierte Patienten',
     'adminpatients.empty': 'Noch keine Patienten registriert.',
     'adminpatients.btn_edit': 'Bearbeiten',
+    'adminpatients.role_label': 'Rolle',
+    'adminpatients.specialty_if_doctor': 'Nur bei Beförderung zu Arzt',
 
     'common.back': 'Zurück',
     'common.close': 'Schließen',

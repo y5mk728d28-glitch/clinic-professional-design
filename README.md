@@ -47,6 +47,32 @@ Según la configuración del proyecto de Supabase, puede pedir confirmar el
 correo antes de poder iniciar sesión. "¿Olvidaste tu contraseña?" en el login
 envía un correo de recuperación.
 
+## Modelo de seguridad y roles (leer antes de compartir el link)
+
+El registro público (botón "Crear cuenta") **siempre crea la cuenta como
+Paciente**, sin importar qué formulario se use — esto es una decisión
+deliberada a nivel de base de datos (`handle_new_user()` en
+`supabase/schema.sql` ignora cualquier rol que mande el cliente). Si no fuera
+así, cualquiera con el link podría autoasignarse "Administrador" con una
+simple llamada a `supabase.auth.signUp()` desde la consola del navegador —
+el código del frontend siempre es visible, así que la única capa confiable
+es la base de datos, no el formulario.
+
+**Cómo se vuelve alguien Doctor o Administrador:**
+
+- **Doctor**: un administrador ya existente va a Panel de Admin →
+  Pacientes → busca a esa persona (ya registrada como paciente) → "Editar" →
+  cambia el campo "Rol" a Doctor y completa su especialidad.
+- **Administrador**: no hay botón para esto en la app a propósito — es
+  demasiado sensible para dejarlo a un clic. El dueño de la clínica se
+  asciende a sí mismo UNA vez, por SQL, directo en Supabase:
+  ```sql
+  update public.profiles set role = 'admin' where email = 'tu-correo@ejemplo.com';
+  ```
+  (Dashboard de Supabase → SQL Editor → pega eso con tu correo real → Run).
+  Luego, si ese admin quiere dar acceso de admin a alguien más (ej. su
+  recepcionista), lo hace con la misma consulta.
+
 ## Roles
 
 - **Paciente**: calendario de disponibilidad (azul = disponible, rojo =
@@ -97,6 +123,35 @@ js/config.js            Configuración por negocio (nombre, moneda, íconos)
 supabase/schema.sql     Tablas, seguridad (RLS) y trigger de registro
 manifest.json, sw.js    Soporte PWA (instalar en pantalla de inicio)
 ```
+
+## Usar esto como plantilla para una clínica nueva
+
+Cada clínica = su propio repo + su propio proyecto de Supabase (no comparten
+datos entre sí). Pasos para la clínica #2, #3, etc.:
+
+1. **Marca este repo como plantilla**: en GitHub, `Settings` → `General` →
+   marca la casilla "Template repository". Así, cada vez que quieras una
+   clínica nueva, entras al repo y le das al botón verde **"Use this
+   template"** en vez de clonarlo a mano — te da una copia limpia, sin el
+   historial de commits de esta clínica.
+2. **Crea un proyecto de Supabase nuevo** para esa clínica (repite los pasos
+   de "Configurar el backend" de arriba) — cada clínica necesita su propia
+   base de datos, nunca reutilices la misma entre clínicas distintas.
+3. En el repo nuevo, actualiza `js/supabaseClient.js` con la URL y clave de
+   ESE proyecto.
+4. Personaliza `js/config.js` (nombre del negocio) y, si hace falta, la
+   paleta en `css/styles.css` (`:root`) para la marca de esa clínica.
+5. Activa GitHub Pages en el repo nuevo (`Settings` → `Pages`) para tener su
+   URL propia.
+6. Sigue los pasos de "Primer uso" y del modelo de seguridad de arriba para
+   volverte admin de esa instancia.
+
+Esto es "una instancia estática por clínica", no un único backend
+multi-clínica — es lo más simple y seguro mientras sean pocos clientes. Si
+en el futuro esto crece a muchas clínicas, ahí sí conviene evolucionar a una
+arquitectura multi-tenant de verdad (una sola base de datos compartida con
+una columna `clinic_id` en cada tabla), pero es un cambio de arquitectura
+grande — no hace falta adelantarlo ahora.
 
 ## Próximos pasos
 
