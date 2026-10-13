@@ -1,22 +1,12 @@
-const CACHE_NAME = 'cpd-cache-v4';
-const CORE_ASSETS = [
-  './',
-  './index.html',
-  './css/styles.css',
-  './js/app.js',
-  './js/i18n.js',
-  './js/db.js',
-  './js/supabaseClient.js',
-  './js/calendar.js',
-  './js/config.js',
-  './manifest.json',
-];
+const CACHE_NAME = 'cpd-cache-v5';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)));
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
+// Borra cualquier caché de versiones anteriores del service worker (de
+// cuando sí intentábamos guardar archivos en caché) para no dejar basura
+// ocupando espacio en el teléfono de nadie.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
@@ -24,31 +14,18 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Red primero, caché solo como respaldo sin internet. Antes era al revés
-// (caché primero) y eso significaba que cualquier cambio nuevo que
-// publicáramos nunca le llegaba a quien ya tenía la app instalada, sin
-// importar cuántas veces le diera "refrescar". Con esto, mientras haya
-// internet (que esta app siempre necesita, por el backend real) se ve
-// siempre la última versión.
-//
-// Esto SOLO debe aplicar a los archivos de la app (HTML/CSS/JS propios).
-// Las llamadas reales al backend (login, registro, recuperar contraseña,
-// cualquier fetch a Supabase) son de otro origen y casi siempre no son GET
-// — la Cache API ni siquiera admite guardar algo que no sea GET. Si las
-// dejábamos pasar por esta misma lógica, un fallo al intentar cachearlas
-// hacía que la petición real nunca se completara (por eso no llegaba el
-// correo de recuperación). Así que esas se dejan pasar sin tocar.
+// A propósito esto NO intenta guardar nada en caché ni inventar una
+// respuesta de respaldo — cada intento de hacerlo (primero caché-primero,
+// luego red-con-respaldo-en-caché) terminó rompiendo peticiones reales
+// (login, registro, recuperar contraseña) en Safari/iOS: en cuanto un
+// fetch fallaba por cualquier motivo y no había nada guardado para ese
+// archivo, devolvíamos "nada" (undefined) como respuesta, y eso es
+// justo lo que provoca el error "FetchEvent.respondWith received an
+// error: Returned response is null". Esta app siempre necesita internet
+// de todas formas (por el backend real), así que no hay beneficio real en
+// un respaldo de caché — solo dejamos pasar la petición directo a la red.
+// Esto también cumple el requisito técnico de "tener un fetch handler"
+// para que la app se pueda instalar como PWA.
 self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-
-  event.respondWith(
-    fetch(req)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-        return response;
-      })
-      .catch(() => caches.match(req))
-  );
+  event.respondWith(fetch(event.request));
 });
