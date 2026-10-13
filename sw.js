@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cpd-cache-v3';
+const CACHE_NAME = 'cpd-cache-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -30,14 +30,25 @@ self.addEventListener('activate', (event) => {
 // importar cuántas veces le diera "refrescar". Con esto, mientras haya
 // internet (que esta app siempre necesita, por el backend real) se ve
 // siempre la última versión.
+//
+// Esto SOLO debe aplicar a los archivos de la app (HTML/CSS/JS propios).
+// Las llamadas reales al backend (login, registro, recuperar contraseña,
+// cualquier fetch a Supabase) son de otro origen y casi siempre no son GET
+// — la Cache API ni siquiera admite guardar algo que no sea GET. Si las
+// dejábamos pasar por esta misma lógica, un fallo al intentar cachearlas
+// hacía que la petición real nunca se completara (por eso no llegaba el
+// correo de recuperación). Así que esas se dejan pasar sin tocar.
 self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(req)
       .then((response) => {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(req))
   );
 });
